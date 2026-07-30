@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Composites Studio — Design · Manufacture · Data · ML · Decision</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#eef3f6; --panel:#ffffff; --ink:#13232e; --mute:#5b7181; --line:#d5dfe6;
+    --blue:#0e7490; --blue-dk:#0b5c73; --blue-lt:#e0f0f5;
+    --ok:#15803d; --warn:#d97706; --bad:#c0392b;
+    --mono:ui-monospace,'SFMono-Regular','DejaVu Sans Mono',monospace;
+    --sans:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+  .top{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 22px;display:flex;
+    align-items:center;gap:18px;flex-wrap:wrap}
+  .logo{font-size:20px;font-weight:700;letter-spacing:-.01em}
+  .logo span{color:var(--blue)}
+  .tagline{color:var(--mute);font-size:12.5px}
+  .top select{margin-left:auto;padding:7px 10px;border:1px solid var(--line);border-radius:6px;
+    background:#fff;font-size:13px;font-family:var(--sans)}
+
+  .tabs{display:flex;gap:4px;background:var(--panel);border-bottom:2px solid var(--line);padding:0 18px}
+  .tab{padding:11px 18px;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--mute);
+    border-bottom:3px solid transparent;margin-bottom:-2px;user-select:none}
+  .tab:hover{color:var(--ink)}
+  .tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+  .tab .n{font-family:var(--mono);font-size:11px;opacity:.65;margin-right:5px}
+
+  .page{display:none;padding:18px;max-width:1360px;margin:0 auto}
+  .page.on{display:block}
+
+  .cols{display:grid;gap:16px}
+  .c-321{grid-template-columns:300px 1fr 330px}
+  .c-2{grid-template-columns:1fr 1fr}
+  .c-31{grid-template-columns:1fr 360px}
+  @media(max-width:1080px){.c-321,.c-2,.c-31{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;
+    box-shadow:0 1px 3px rgba(19,35,46,.05)}
+  .card h3{margin:0 0 2px;font-size:15px;font-weight:700}
+  .card .sub{font-size:12px;color:var(--mute);margin-bottom:12px}
+
+  label.f{display:block;margin:10px 0 3px;font-size:12px;font-weight:600}
+  label.f .u{color:var(--mute);font-weight:400;font-family:var(--mono);font-size:11px}
+  .row{display:flex;align-items:center;gap:10px}
+  input[type=range]{flex:1;accent-color:var(--blue)}
+  input[type=number],input[type=text]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;
+    font-family:var(--mono);font-size:12.5px;width:100%}
+  select.w{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;font-size:12.5px}
+  .v{font-family:var(--mono);font-size:12.5px;min-width:58px;text-align:right;color:var(--blue-dk);font-weight:700}
+
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+  .kpi{border:1px solid var(--line);border-radius:8px;padding:9px 10px;text-align:center;background:#fbfdfe}
+  .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);font-weight:600}
+  .kpi .x{font-family:var(--mono);font-size:20px;font-weight:700;margin-top:2px}
+  .kpi .s{font-size:10.5px;color:var(--mute)}
+  .kpi.g .x{color:var(--ok)} .kpi.a .x{color:var(--warn)} .kpi.r .x{color:var(--bad)}
+
+  canvas#vcan{width:100%;height:auto;display:block;border-radius:8px;background:#0a1d29}
+  .chartbox{position:relative;height:210px}
+  .chartbox.t{height:250px}
+
+  button{font-family:var(--sans);font-weight:600;font-size:13px;padding:8px 16px;border-radius:7px;
+    border:1px solid var(--blue);background:var(--blue);color:#fff;cursor:pointer}
+  button:hover{background:var(--blue-dk)}
+  button.gh{background:#fff;color:var(--blue)}
+  button.gh:hover{background:var(--blue-lt)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+
+  .grid-r{display:grid;grid-template-columns:1fr 72px 72px;gap:6px;align-items:center;margin:4px 0}
+  .grid-r .lab{font-size:12px;font-weight:600}
+  .grid-r .lab .u{color:var(--mute);font-weight:400;font-family:var(--mono);font-size:10.5px}
+  .chk{display:flex;gap:12px;flex-wrap:wrap;margin:5px 0}
+  .chk label{font-size:12px;display:flex;gap:5px;align-items:center;font-weight:500}
+  .grp{font-weight:700;font-size:12px;margin:10px 0 2px;color:var(--blue-dk)}
+
+  .prog{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-top:10px;display:none}
+  .prog>div{height:100%;width:0%;background:var(--blue);transition:width .12s}
+  .status{font-family:var(--mono);font-size:12px;color:var(--blue-dk);margin-top:6px;font-weight:600}
+
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  th,td{padding:4px 7px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--mute);text-transform:uppercase;font-size:9.5px;letter-spacing:.05em;position:sticky;top:0;background:var(--panel)}
+  td.l,th.l{text-align:left}
+  .twrap{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px}
+
+  .pill{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 9px;border-radius:10px;font-weight:700;margin:2px 2px 0 0}
+  .pill.g{background:#dcf2e4;color:var(--ok)} .pill.a{background:#fdeeda;color:var(--warn)}
+  .pill.r{background:#f9e2dd;color:var(--bad)} .pill.b{background:var(--blue-lt);color:var(--blue-dk)}
+
+  .imp{display:grid;grid-template-columns:118px 1fr 44px;gap:8px;align-items:center;margin:4px 0}
+  .imp .n{font-family:var(--mono);font-size:11px;text-align:right}
+  .imp .b{height:12px;background:var(--blue);border-radius:3px;min-width:2px}
+  .imp .x{font-family:var(--mono);font-size:11px;color:var(--blue-dk);font-weight:700}
+
+  .note{border-left:3px solid var(--blue);background:var(--blue-lt);border-radius:0 8px 8px 0;
+    padding:10px 13px;font-size:12.5px;margin-top:12px;color:#0b4a5c}
+  .note b{color:var(--blue-dk)}
+  .qa{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-top:12px;background:#fbfdfe}
+  .qa .q{font-weight:700;font-size:13.5px;margin-bottom:6px}
+  .qa textarea{width:100%;min-height:64px;border:1px solid var(--line);border-radius:6px;padding:8px;
+    font-family:var(--sans);font-size:13px;resize:vertical}
+  details.eq{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:10px 14px;background:#fbfdfe}
+  details.eq summary{font-weight:700;font-size:13px;cursor:pointer;color:var(--blue-dk)}
+  details.eq .fx{font-family:var(--mono);font-size:11.5px;line-height:1.85;margin-top:8px;color:var(--ink)}
+  .verd{border-radius:8px;padding:12px 14px;margin-top:10px;font-size:13px}
+  .verd.ok{background:#dcf2e4;border:1px solid #b7e0c5}
+  .verd.no{background:#f9e2dd;border:1px solid #efc4bb}
+  .verd b{font-size:15px}
+  .derived{font-family:var(--mono);font-size:11.5px;background:#f4f8fa;border:1px solid var(--line);
+    border-radius:8px;padding:8px 10px;margin-top:12px;line-height:1.8}
+  .derived b{color:var(--blue-dk)}
+  footer{padding:18px 22px;color:var(--mute);font-family:var(--mono);font-size:11.5px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="logo">Composites <span>Studio</span></div>
+  <div class="tagline">Design → manufacture → data → ML → decision · deep-sea pressure vessel · OceanGate Titan case study</div>
+  <select id="preset" onchange="applyPreset()">
+    <option value="">Load a preset…</option>
+    <option value="titan">Titan as-built (FW carbon cylinder, hoop layup)</option>
+    <option value="sphere">Certified sphere (AFP carbon, quasi-isotropic)</option>
+    <option value="glass">Budget glass sphere (hand layup, 800 m)</option>
+  </select>
+</div>
+
+<div class="tabs">
+  <div class="tab on" data-t="design"><span class="n">1</span>Design Lab</div>
+  <div class="tab" data-t="data"><span class="n">2</span>Dataset Generator</div>
+  <div class="tab" data-t="ml"><span class="n">3</span>ML Lab</div>
+  <div class="tab" data-t="defend"><span class="n">4</span>Decision &amp; Defense</div>
+</div>
+
+<!-- ════════ 1 · DESIGN LAB ════════ -->
+<div class="page on" id="pg-design">
+  <div class="cols c-321">
+    <div class="card">
+      <h3>Design variables</h3>
+      <div class="sub">Material → laminate → manufacturing → geometry. Everything is causally linked.</div>
+
+      <label class="f">Fiber</label>
+      <select id="fiber" class="w" onchange="upd()">
+        <option value="carbon">Carbon — 230 GPa · 3500 MPa</option>
+        <option value="glass">E-Glass — 72 GPa · 2400 MPa</option>
+        <option value="aramid">Aramid — 124 GPa · 3600 MPa</option>
+      </select>
+
+      <label class="f">Matrix</label>
+      <select id="matrix" class="w" onchange="upd()">
+        <option value="epoxy">Epoxy — cure 160 °C</option>
+        <option value="vinylester">Vinylester — cure 110 °C</option>
+        <option value="polyester">Polyester — cure 90 °C</option>
+      </select>
+
+      <label class="f">Stacking sequence</label>
+      <select id="layup" class="w" onchange="upd()">
+        <option value="hoop">[90₂/0]s — hoop-dominant</option>
+        <option value="pm55">[±55]s — netting optimum</option>
+        <option value="cross">[0/90]s — cross-ply</option>
+        <option value="quasi">[0/±45/90]s — quasi-isotropic</option>
+        <option value="pm45">[±45]s — shear layup</option>
+      </select>
+
+      <label class="f">Manufacturing process</label>
+      <select id="proc" class="w" onchange="upd()">
+        <option value="filament_winding">Filament winding</option>
+        <option value="afp">Automated fiber placement</option>
+        <option value="autoclave">Autoclave prepreg</option>
+        <option value="rtm">Resin transfer molding</option>
+        <option value="hand_layup">Hand layup</option>
+      </select>
+
+      <label class="f">Geometry</label>
+      <select id="geom" class="w" onchange="upd()">
+        <option value="cyl">Cylinder (Titan's choice)</option>
+        <option value="sphere">Sphere</option>
+      </select>
+
+      <label class="f">Fiber volume fraction V<sub>f</sub></label>
+      <div class="row"><input type="range" id="vf" min="0.30" max="0.70" step="0.01" value="0.60" oninput="upd()"><span class="v" id="vf-v"></span></div>
+
+      <label class="f">Operating depth <span class="u">m</span></label>
+      <div class="row"><input type="range" id="depth" min="200" max="6000" step="50" value="3800" oninput="upd()"><span class="v" id="depth-v"></span></div>
+
+      <label class="f">Inner radius r <span class="u">m</span></label>
+      <div class="row"><input type="range" id="rad" min="0.40" max="1.20" step="0.02" value="0.70" oninput="upd()"><span class="v" id="rad-v"></span></div>
+
+      <label class="f">Wall thickness t <span class="u">m</span></label>
+      <div class="row"><input type="range" id="thick" min="0.020" max="0.220" step="0.005" value="0.065" oninput="upd()"><span class="v" id="thick-v"></span></div>
+
+      <label class="f">Initial flaw a<sub>0</sub> <span class="u">mm</span></label>
+      <div class="row"><input type="range" id="a0" min="0.2" max="6.0" step="0.1" value="1.0" oninput="upd()"><span class="v" id="a0-v"></span></div>
+
+      <div class="derived" id="derived"></div>
+
+      <details class="eq">
+        <summary>Show the physics chain</summary>
+        <div class="fx">
+          E1 = E_f·V_f + E_m·V_m &nbsp;|&nbsp; 1/E2 = V_f/E_f + V_m/E_m<br>
+          1/E_θ = c⁴/E1 + s⁴/E2 + c²s²(1/G12 − 2ν12/E1)<br>
+          η_o = mean cos⁴(θ − load dir) &nbsp;(Krenchel)<br>
+          σ_allow = 0.45·(η_o·σ_f·V_f + σ_m·V_m)·k_cure·k_env·(1−6v_v)·(1−ψ/60)<br>
+          σ_wall = P·r/t (cyl hoop) | P·r/2t (sphere) + axial/bending terms<br>
+          P_cr,sph = k_q·1.21·E_lam·(t/r)² &nbsp;|&nbsp; P_cr,cyl = k_q·0.23·E_lam·(t/r)^2.5<br>
+          k_q = 0.25 + 0.45·quality &nbsp;(imperfection knockdown)<br>
+          a_c = (1/π)(K_IC/σ_eff·Y)² , σ_eff = σ + 0.5σ_res<br>
+          N_f: Paris law, Δσ = σ_eff(1−R)<br>
+          Failure mode = argmin(margins: fiber, matrix, ILSS, buckling, fatigue, deflection)
+        </div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>Vessel at depth</h3>
+      <div class="sub">Wall colored by factor of safety · flaw gauge compares a₀ to critical crack a_c.</div>
+      <canvas id="vcan" width="640" height="480"></canvas>
+    </div>
+
+    <div class="card">
+      <h3>Physics outputs</h3>
+      <div class="sub">The complete margin picture — one failure mode always governs.</div>
+      <div class="kpis">
+        <div class="kpi" id="k-fos"><div class="l">Factor of safety</div><div class="x" id="o-fos">—</div><div class="s">target ≥ 2.5</div></div>
+        <div class="kpi" id="k-nf"><div class="l">Cycles to fracture</div><div class="x" id="o-nf">—</div><div class="s">target ≥ 1000</div></div>
+        <div class="kpi" id="k-buck"><div class="l">Buckling margin</div><div class="x" id="o-buck">—</div><div class="s">P_cr / P ≥ 1.5</div></div>
+        <div class="kpi"><div class="l">Wall stress</div><div class="x" id="o-sig">—</div><div class="s">MPa</div></div>
+        <div class="kpi"><div class="l">Allowable</div><div class="x" id="o-sall">—</div><div class="s">MPa</div></div>
+        <div class="kpi"><div class="l">Critical crack</div><div class="x" id="o-ac">—</div><div class="s">mm</div></div>
+        <div class="kpi"><div class="l">Shell mass</div><div class="x" id="o-mass">—</div><div class="s">kg</div></div>
+        <div class="kpi"><div class="l">Embodied CO₂</div><div class="x" id="o-co2">—</div><div class="s">kg</div></div>
+      </div>
+      <div style="margin-top:10px" id="mode-pills"></div>
+      <div class="chartbox" style="margin-top:12px"><canvas id="ch-fos"></canvas></div>
+      <div class="note" id="design-note"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 2 · DATASET GENERATOR ════════ -->
+<div class="page" id="pg-data">
+  <div class="cols c-31">
+    <div class="card">
+      <h3>Engineering design dataset generator</h3>
+      <div class="sub">Each row is a complete design: constituents, laminate, manufacturing, loading, all failure modes, sustainability, and decision metrics — 73 columns. Plus an optional ply-level relational table.</div>
+
+      <div class="cols c-2" style="gap:14px">
+        <div>
+          <div class="grp">Continuous ranges (min / max)</div>
+          <div class="grid-r"><div class="lab">V<sub>f</sub></div><input type="number" id="r-vf-a" value="0.30" step="0.01"><input type="number" id="r-vf-b" value="0.70" step="0.01"></div>
+          <div class="grid-r"><div class="lab">Depth <span class="u">m</span></div><input type="number" id="r-dep-a" value="200"><input type="number" id="r-dep-b" value="6000"></div>
+          <div class="grid-r"><div class="lab">Radius <span class="u">m</span></div><input type="number" id="r-rad-a" value="0.40" step="0.02"><input type="number" id="r-rad-b" value="1.20" step="0.02"></div>
+          <div class="grid-r"><div class="lab">Thickness <span class="u">m</span></div><input type="number" id="r-th-a" value="0.020" step="0.005"><input type="number" id="r-th-b" value="0.220" step="0.005"></div>
+          <div class="grid-r"><div class="lab">Flaw a<sub>0</sub> <span class="u">mm</span></div><input type="number" id="r-a0-a" value="0.2" step="0.1"><input type="number" id="r-a0-b" value="6.0" step="0.1"></div>
+          <div class="note" style="margin-top:10px">Manufacturing (cure cycle, consolidation pressure, cooling rate, voids, misalignment) and loading (axial, bending, R-ratio, temperature, environment) are sampled automatically per process and matrix with realistic noise — documented in the metadata file.</div>
+        </div>
+        <div>
+          <div class="grp">Fibers</div>
+          <div class="chk">
+            <label><input type="checkbox" id="c-carbon" checked>Carbon</label>
+            <label><input type="checkbox" id="c-glass" checked>Glass</label>
+            <label><input type="checkbox" id="c-aramid" checked>Aramid</label>
+          </div>
+          <div class="grp">Matrices</div>
+          <div class="chk">
+            <label><input type="checkbox" id="c-epoxy" checked>Epoxy</label>
+            <label><input type="checkbox" id="c-vinyl" checked>Vinylester</label>
+            <label><input type="checkbox" id="c-poly" checked>Polyester</label>
+          </div>
+          <div class="grp">Processes</div>
+          <div class="chk">
+            <label><input type="checkbox" id="c-fw" checked>Filament winding</label>
+            <label><input type="checkbox" id="c-afp" checked>AFP</label>
+            <label><input type="checkbox" id="c-auto" checked>Autoclave</label>
+            <label><input type="checkbox" id="c-rtm" checked>RTM</label>
+            <label><input type="checkbox" id="c-hand" checked>Hand layup</label>
+          </div>
+          <div class="grp">Layups</div>
+          <div class="chk">
+            <label><input type="checkbox" id="c-hoop" checked>[90₂/0]s</label>
+            <label><input type="checkbox" id="c-pm55" checked>[±55]s</label>
+            <label><input type="checkbox" id="c-cross" checked>[0/90]s</label>
+            <label><input type="checkbox" id="c-quasi" checked>[0/±45/90]s</label>
+            <label><input type="checkbox" id="c-pm45" checked>[±45]s</label>
+          </div>
+          <div class="grp">Geometries</div>
+          <div class="chk">
+            <label><input type="checkbox" id="c-sph" checked>Sphere</label>
+            <label><input type="checkbox" id="c-cyl" checked>Cylinder</label>
+          </div>
+          <label class="f">Number of designs</label>
+          <input type="number" id="g-n" value="25000" min="10" step="1000">
+          <label class="f">Random seed</label>
+          <input type="number" id="g-seed" value="42">
+          <div class="chk" style="margin-top:10px">
+            <label><input type="checkbox" id="g-ply" checked>Ply-level table for first</label>
+          </div>
+          <input type="number" id="g-plyn" value="300" min="10" style="width:90px"> <span style="font-size:11px;color:var(--mute)">designs (relational: join on design_id)</span>
+        </div>
+      </div>
+
+      <div class="btns">
+        <button onclick="generate()" id="gen-btn">Generate dataset</button>
+        <button class="gh" onclick="downloadCSV()" id="dl-csv" disabled>designs.csv</button>
+        <button class="gh" onclick="downloadPlies()" id="dl-ply" disabled>plies.csv</button>
+        <button class="gh" onclick="downloadMeta()" id="dl-meta" disabled>metadata.json</button>
+        <button class="gh" onclick="clearData()">Clear</button>
+      </div>
+      <div class="prog" id="prog"><div id="prog-bar"></div></div>
+      <div class="status" id="g-status">No dataset yet.</div>
+
+      <div class="twrap" id="preview-wrap" style="display:none"><table id="preview"></table></div>
+      <div class="twrap" id="ply-wrap" style="display:none"><table id="ply-preview"></table></div>
+    </div>
+
+    <div class="card">
+      <h3>Dataset health</h3>
+      <div class="sub">Class balance and failure-mode mix — a model can only learn boundaries it can see.</div>
+      <div class="kpis">
+        <div class="kpi"><div class="l">Designs</div><div class="x" id="h-n">0</div><div class="s">rows</div></div>
+        <div class="kpi"><div class="l">Feasible</div><div class="x" id="h-feas">—</div><div class="s">all gates pass</div></div>
+        <div class="kpi"><div class="l">Median FoS</div><div class="x" id="h-med">—</div><div class="s">—</div></div>
+        <div class="kpi"><div class="l">Ply rows</div><div class="x" id="h-ply">0</div><div class="s">companion table</div></div>
+      </div>
+      <div class="grp" style="margin-top:12px">Governing failure modes</div>
+      <div id="h-modes"><span class="status">—</span></div>
+      <div class="chartbox" style="margin-top:12px"><canvas id="ch-hist"></canvas></div>
+      <div class="note"><b>Deliberately imperfect.</b> Uniform sampling produces poor, marginal, feasible, and over-designed vessels on purpose. Check the failure-mode mix: if one mode never governs, students cannot learn when it matters.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 3 · ML LAB ════════ -->
+<div class="page" id="pg-ml">
+  <div class="cols c-321">
+    <div class="card">
+      <h3>Train a surrogate</h3>
+      <div class="sub">Exact closed-form ridge regression on <b>your</b> dataset — trains in a background worker.</div>
+      <div class="kpis" style="grid-template-columns:1fr">
+        <div class="kpi"><div class="l">Rows available</div><div class="x" id="m-rows">0</div><div class="s">from Dataset Generator</div></div>
+      </div>
+      <label class="f">Prediction target</label>
+      <select id="m-target" class="w">
+        <option value="fos">Factor of safety (log)</option>
+        <option value="embodied_CO2_kg">Embodied CO₂, kg (log)</option>
+        <option value="mass_kg">Shell mass, kg (log)</option>
+      </select>
+      <label class="f">Hold-out test fraction</label>
+      <select id="m-split" class="w"><option value="0.2">20 %</option><option value="0.3">30 %</option></select>
+      <div class="chk" style="margin-top:10px">
+        <label><input type="checkbox" id="m-phys">Physics-informed features (ln r/t, ln depth)</label>
+      </div>
+      <div class="btns">
+        <button onclick="train()" id="tr-btn">Train model</button>
+        <button class="gh" onclick="learningCurve()" id="lc-btn" disabled>Learning curve</button>
+      </div>
+      <div class="status" id="m-status">Not trained.</div>
+      <div class="kpis" style="margin-top:12px">
+        <div class="kpi"><div class="l">R² (test)</div><div class="x" id="m-r2">—</div><div class="s">1.0 = perfect</div></div>
+        <div class="kpi"><div class="l">Mean abs error</div><div class="x" id="m-mae">—</div><div class="s" id="m-mae-u">target units</div></div>
+        <div class="kpi"><div class="l">RMSE</div><div class="x" id="m-rmse">—</div><div class="s">target units</div></div>
+        <div class="kpi"><div class="l">Worst error</div><div class="x" id="m-max">—</div><div class="s">target units</div></div>
+      </div>
+      <div class="note"><b>Try this sequence:</b> train FoS plain → note R². Tick physics features → retrain. Then check feature importance: do voids and misalignment matter the way manufacturing theory says they should?</div>
+    </div>
+
+    <div class="card">
+      <h3>Predicted vs. truth</h3>
+      <div class="sub">Held-out designs the model never saw. Perfect predictions sit on the dashed line.</div>
+      <div class="chartbox t"><canvas id="ch-parity"></canvas></div>
+      <h3 style="margin-top:16px">Learning curve</h3>
+      <div class="sub">R² vs. training rows — where does more data stop paying for itself?</div>
+      <div class="chartbox"><canvas id="ch-curve"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h3>What drives the target?</h3>
+      <div class="sub">Standardized coefficient magnitudes — cross-check against mechanics and manufacturing theory.</div>
+      <div id="imp"><div class="status">Train to reveal.</div></div>
+
+      <h3 style="margin-top:16px">Probe one prediction</h3>
+      <div class="sub">Compare model vs. exact physics anywhere — including outside the training envelope.</div>
+      <label class="f">V<sub>f</sub></label>
+      <div class="row"><input type="range" id="q-vf" min="0.30" max="0.70" step="0.01" value="0.55" oninput="probe()"><span class="v" id="q-vf-v"></span></div>
+      <label class="f">Layup</label>
+      <select id="q-layup" class="w" onchange="probe()">
+        <option value="hoop">[90₂/0]s</option><option value="pm55">[±55]s</option>
+        <option value="cross">[0/90]s</option><option value="quasi">[0/±45/90]s</option><option value="pm45">[±45]s</option>
+      </select>
+      <label class="f">r / t ratio</label>
+      <div class="row"><input type="range" id="q-rt" min="3" max="35" step="0.5" value="9" oninput="probe()"><span class="v" id="q-rt-v"></span></div>
+      <label class="f">Depth <span class="u">m</span></label>
+      <div class="row"><input type="range" id="q-dep" min="200" max="6000" step="50" value="3800" oninput="probe()"><span class="v" id="q-dep-v"></span></div>
+      <label class="f">Geometry</label>
+      <select id="q-geom" class="w" onchange="probe()"><option value="sphere">Sphere</option><option value="cyl">Cylinder</option></select>
+      <div class="kpis" style="margin-top:10px">
+        <div class="kpi"><div class="l" id="q-pred-l">Model says</div><div class="x" id="q-pred" style="color:var(--blue-dk)">—</div><div class="s" id="q-tgt-u">—</div></div>
+        <div class="kpi"><div class="l">Physics says</div><div class="x" id="q-true">—</div><div class="s" id="q-tgt-u2">—</div></div>
+      </div>
+      <div id="q-verdict" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ 4 · DECISION & DEFENSE ════════ -->
+<div class="page" id="pg-defend">
+  <div class="cols c-2">
+    <div class="card">
+      <h3>Commit your final design</h3>
+      <div class="sub">The model can advise. You certify. Physics gets the last word.</div>
+      <div class="cols c-2" style="gap:12px">
+        <div>
+          <label class="f">Fiber</label>
+          <select id="d-fiber" class="w" onchange="dupd()"><option value="carbon">Carbon</option><option value="glass">E-Glass</option><option value="aramid">Aramid</option></select>
+          <label class="f">Matrix</label>
+          <select id="d-matrix" class="w" onchange="dupd()"><option value="epoxy">Epoxy</option><option value="vinylester">Vinylester</option><option value="polyester">Polyester</option></select>
+          <label class="f">Layup</label>
+          <select id="d-layup" class="w" onchange="dupd()">
+            <option value="quasi">[0/±45/90]s</option><option value="hoop">[90₂/0]s</option>
+            <option value="pm55">[±55]s</option><option value="cross">[0/90]s</option><option value="pm45">[±45]s</option>
+          </select>
+          <label class="f">Process</label>
+          <select id="d-proc" class="w" onchange="dupd()">
+            <option value="afp">AFP</option><option value="filament_winding">Filament winding</option>
+            <option value="autoclave">Autoclave</option><option value="rtm">RTM</option><option value="hand_layup">Hand layup</option>
+          </select>
+          <label class="f">Geometry</label>
+          <select id="d-geom" class="w" onchange="dupd()"><option value="sphere">Sphere</option><option value="cyl">Cylinder</option></select>
+        </div>
+        <div>
+          <label class="f">V<sub>f</sub></label>
+          <div class="row"><input type="range" id="d-vf" min="0.30" max="0.70" step="0.01" value="0.62" oninput="dupd()"><span class="v" id="d-vf-v"></span></div>
+          <label class="f">Depth <span class="u">m</span></label>
+          <div class="row"><input type="range" id="d-dep" min="200" max="6000" step="50" value="3800" oninput="dupd()"><span class="v" id="d-dep-v"></span></div>
+          <label class="f">Radius <span class="u">m</span></label>
+          <div class="row"><input type="range" id="d-rad" min="0.40" max="1.20" step="0.02" value="0.70" oninput="dupd()"><span class="v" id="d-rad-v"></span></div>
+          <label class="f">Thickness <span class="u">m</span></label>
+          <div class="row"><input type="range" id="d-th" min="0.020" max="0.220" step="0.005" value="0.115" oninput="dupd()"><span class="v" id="d-th-v"></span></div>
+          <label class="f">Flaw a<sub>0</sub> <span class="u">mm</span></label>
+          <div class="row"><input type="range" id="d-a0" min="0.2" max="6.0" step="0.1" value="1.0" oninput="dupd()"><span class="v" id="d-a0-v"></span></div>
+        </div>
+      </div>
+      <div class="kpis" style="margin-top:12px">
+        <div class="kpi" id="dk-fos"><div class="l">FoS · physics</div><div class="x" id="d-fos">—</div><div class="s">≥ 2.5</div></div>
+        <div class="kpi" id="dk-nf"><div class="l">Cycles · physics</div><div class="x" id="d-nf">—</div><div class="s">≥ 1000</div></div>
+        <div class="kpi" id="dk-buck"><div class="l">Buckling margin</div><div class="x" id="d-buck">—</div><div class="s">≥ 1.5</div></div>
+        <div class="kpi"><div class="l" id="d-pred-l">Model says</div><div class="x" id="d-pred" style="color:var(--blue-dk)">—</div><div class="s">surrogate</div></div>
+        <div class="kpi"><div class="l">Shell mass</div><div class="x" id="d-mass">—</div><div class="s">kg</div></div>
+        <div class="kpi"><div class="l">Sustainability</div><div class="x" id="d-sust">—</div><div class="s">index / 100</div></div>
+      </div>
+      <div style="margin-top:8px" id="d-pills"></div>
+      <div id="d-verdict"></div>
+    </div>
+
+    <div class="card">
+      <h3>Engineering defense</h3>
+      <div class="sub">These three answers are your assessable artifact — Curiosity · Connections · Creating Value.</div>
+      <div class="qa"><div class="q">1 · State your design and the numbers that justify it — including which failure mode governs and why.</div>
+        <textarea id="ans1" placeholder="Our hull is an AFP carbon/epoxy quasi-isotropic sphere at 3800 m. Buckling governs at margin 2.1, FoS = 2.8…"></textarea></div>
+      <div class="qa"><div class="q">2 · Where did the surrogate disagree with physics, and why did you side with the mechanics?</div>
+        <textarea id="ans2" placeholder="In the thin-wall corner the model over-predicted FoS because few training rows lived there…"></textarea></div>
+      <div class="qa"><div class="q">3 · The Stockton Rush question — what evidence would you demand before a human dive? Is the model that evidence?</div>
+        <textarea id="ans3" placeholder="No. A surrogate interpolates prior tests; it cannot certify an untested corner. We would require…"></textarea></div>
+      <div class="btns"><button onclick="exportBrief()">Export design brief (.txt)</button></div>
+    </div>
+  </div>
+</div>
+
+<footer>Composites Studio · single file · micromechanics → CLT-lite laminate → manufacturing knockdowns → six failure modes → sustainability · ML: closed-form ridge in a Web Worker · seeded &amp; reproducible</footer>
+
+<script>
+/* ═════════ SHARED ENGINE (main + worker, identical source, indirect-eval safe) ═════════ */
+const ENGINE = [
+"var FIBERS={carbon:{Ef:230,sf:3500,rho:1800,cost:35,cte:-0.5,co2:30,nu:0.20,rec:2},",
+"  glass:{Ef:72,sf:2400,rho:2540,cost:3,cte:5.0,co2:2.5,nu:0.22,rec:5},",
+"  aramid:{Ef:124,sf:3600,rho:1440,cost:22,cte:-2.0,co2:15,nu:0.35,rec:3}};",
+"var MATS={epoxy:{Em:3.5,sm:80,rho:1200,cost:5,cte:60,co2:6,Topt:160,nu:0.35,rec:0},",
+"  vinylester:{Em:3.4,sm:75,rho:1100,cost:4,cte:65,co2:4.5,Topt:110,nu:0.35,rec:0.5},",
+"  polyester:{Em:3.2,sm:60,rho:1150,cost:2.5,cte:80,co2:3,Topt:90,nu:0.36,rec:1}};",
+"var PROCS={filament_winding:{vv0:0.020,mis0:2.0,costM:1.0,eKwh:8,scrap:8,rep:5,name:'Filament winding'},",
+"  afp:{vv0:0.012,mis0:1.0,costM:1.8,eKwh:15,scrap:5,rep:4,name:'AFP'},",
+"  autoclave:{vv0:0.008,mis0:1.5,costM:1.6,eKwh:25,scrap:15,rep:3,name:'Autoclave'},",
+"  rtm:{vv0:0.025,mis0:3.0,costM:1.1,eKwh:10,scrap:12,rep:6,name:'RTM'},",
+"  hand_layup:{vv0:0.040,mis0:5.0,costM:0.7,eKwh:5,scrap:25,rep:8,name:'Hand layup'}};",
+"var LAYUPS={hoop:{name:'[90_2/0]s',pat:[90,90,0]},pm55:{name:'[+-55]s',pat:[55,-55]},",
+"  cross:{name:'[0/90]s',pat:[0,90]},quasi:{name:'[0/+-45/90]s',pat:[0,45,-45,90]},pm45:{name:'[+-45]s',pat:[45,-45]}};",
+"var ENVS={seawater:0.93,cold_seawater:0.95,tropical_seawater:0.88};",
+"var KIC=25,KD=0.45,C_PARIS=1.5e-11,M_PARIS=3.0,Y_GEO=1.12,SW=1025,GRAV=9.81,LIFE_REQ=1000,BUCK_REQ=1.5;",
+"function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}",
+"function kren(pat,dir){var s=0;for(var i=0;i<pat.length;i++){var c=Math.cos((pat[i]-dir)*Math.PI/180);s+=c*c*c*c;}return s/pat.length;}",
+"function Etheta(E1,E2,G12,nu12,ang){var c=Math.cos(ang*Math.PI/180),s=Math.sin(ang*Math.PI/180);",
+"  var c2=c*c,s2=s*s;var inv=c2*c2/E1+s2*s2/E2+c2*s2*(1/G12-2*nu12/E1);return 1/inv;}",
+"function physicsFull(inp){",
+"  var f=FIBERS[inp.fiber],mm=MATS[inp.matrix],pr=PROCS[inp.process],lay=LAYUPS[inp.layup];",
+"  var vf=inp.vf,vm=1-vf;",
+"  /* manufacturing state */",
+"  var vv=Math.min(0.10,Math.max(0.002,pr.vv0*(1.4-0.9*inp.consP/0.7)*(1+(inp.vNoise||0))+(inp.cureHr<1?0.008:0)));",
+"  var mis=Math.min(10,Math.max(0.3,pr.mis0*(1+(inp.mNoise||0))));",
+"  var cureQ=Math.exp(-Math.pow((inp.cureT-mm.Topt)/50,2));",
+"  var tQ=1-Math.exp(-inp.cureHr/1.5);",
+"  var cureF=0.72+0.28*cureQ*tQ;",
+"  /* micromechanics */",
+"  var E1=f.Ef*vf+mm.Em*vm;",
+"  var E2=1/(vf/f.Ef+vm/mm.Em);",
+"  var Gf=f.Ef/(2*(1+f.nu)),Gm=mm.Em/(2*(1+mm.nu));",
+"  var G12=1/(vf/Gf+vm/Gm);",
+"  var nu12=f.nu*vf+mm.nu*vm;",
+"  var a1=(f.cte*f.Ef*vf+mm.cte*mm.Em*vm)/E1;",
+"  var a2=mm.cte*vm*(1+mm.nu)+f.cte*vf*(1+f.nu)-a1*nu12;",
+"  var rhoC=(f.rho*vf+mm.rho*vm)*(1-vv);",
+"  /* laminate stiffness in governing direction(s) */",
+"  var pat=lay.pat;",
+"  function Edir(dir){var s=0;for(var i=0;i<pat.length;i++)s+=Etheta(E1,E2,G12,nu12,pat[i]-dir);return s/pat.length;}",
+"  var etaO,Elam;",
+"  if(inp.geom==='sphere'){etaO=(kren(pat,90)+kren(pat,0))/2;Elam=(Edir(90)+Edir(0))/2;}",
+"  else{etaO=kren(pat,90);Elam=Edir(90);}",
+"  Elam=Elam*(1-3*vv)*(0.9+0.1*cureQ*tQ);",
+"  /* residual stress + quality */",
+"  var resid=Math.min(90,0.12*Math.max(0,inp.cureT-25)*(1+0.12*inp.coolR)*(E1/150));",
+"  var quality=Math.min(1,Math.max(0.05,1-5*vv-mis/50-(1-cureQ*tQ)*0.3));",
+"  /* allowable strength */",
+"  var envF=ENVS[inp.env]||0.93;",
+"  var sAllow=KD*(etaO*f.sf*vf+mm.sm*vm)*cureF*envF*(1-6*vv)*(1-mis/60);",
+"  /* loading */",
+"  var P=SW*GRAV*inp.depth/1e6;",
+"  var r=inp.rad,t=inp.thick,rt=r/t;",
+"  var sigAxExtra=(Math.abs(inp.axial)*1e3/(2*Math.PI*r*t)+Math.abs(inp.bend)*1e3/(Math.PI*r*r*t))/1e6;",
+"  var sigma,sigAx;",
+"  if(inp.geom==='sphere'){sigma=P*r/(2*t)+sigAxExtra/2;sigAx=sigma;}",
+"  else{sigma=P*r/t;sigAx=P*r/(2*t)+sigAxExtra;if(sigAx>sigma)sigma=sigAx;}",
+"  var fos=sAllow/sigma;",
+"  /* buckling */",
+"  var kq=0.25+0.45*quality;",
+"  var Pcr=(inp.geom==='sphere')?kq*1.21*Elam*1000*Math.pow(t/r,2):kq*0.23*Elam*1000*Math.pow(t/r,2.5);",
+"  var mBuck=Pcr/P;",
+"  /* fracture + fatigue */",
+"  var sigEff=sigma+0.5*resid;",
+"  var a0=inp.a0/1000;",
+"  var ac=(1/Math.PI)*Math.pow(KIC/(sigEff*Y_GEO),2);",
+"  var Nf=0;",
+"  if(ac>a0){var dSig=sigEff*(1-inp.R);var ex=1-M_PARIS/2;",
+"    Nf=(Math.pow(ac,ex)-Math.pow(a0,ex))/(ex*C_PARIS*Math.pow(dSig*Y_GEO,M_PARIS)*Math.pow(Math.PI,M_PARIS/2));}",
+"  Nf=Math.max(0,Nf);",
+"  /* secondary structural outputs */",
+"  var strain=sigma/(Elam*1000)*100;",
+"  var defl=sigma*r/(Elam*1000)*1000;",
+"  var freq=1/(2*Math.PI*r)*Math.sqrt(Elam*1e9/rhoC);",
+"  var vol=(inp.geom==='sphere')?4*Math.PI*r*r*t:2*Math.PI*r*t*(4*r);",
+"  var mass=vol*rhoC;",
+"  var senergy=sigma*sigma/(2*Elam*1000)*vol*1000;",
+"  /* margins + governing failure mode */",
+"  var smEff=mm.sm*cureF*envF*(1-6*vv);",
+"  var sigTrans=sigma*(0.08+0.35*(1-etaO));",
+"  var mMatrix=smEff*1.2/sigTrans;",
+"  var tauAllow=0.85*mm.sm*cureF*envF*Math.max(0.02,1-12*vv);",
+"  var tau=sigma*(0.03+0.22*t/r)*(1+mis/15);",
+"  var mIlss=tauAllow/tau;",
+"  var mFat=Math.min(Nf/LIFE_REQ,50);",
+"  var deflLimit=r*1000/80;",
+"  var mDefl=deflLimit/defl;",
+"  var margins=[['fiber_failure',fos],['matrix_cracking',mMatrix],",
+"    [(vv>0.03?'delamination':'interlaminar_shear'),mIlss],['buckling',mBuck],",
+"    ['fatigue_failure',mFat],['excessive_deflection',mDefl]];",
+"  var gm=margins[0];for(var i=1;i<margins.length;i++)if(margins[i][1]<gm[1])gm=margins[i];",
+"  var mode=gm[0];",
+"  var feasible=(fos>=2.5&&Nf>=LIFE_REQ&&mBuck>=BUCK_REQ&&mMatrix>=1&&mIlss>=1&&mDefl>=1)?1:0;",
+"  /* mass, cost */",
+"  var wf=f.rho*vf/((f.rho*vf+mm.rho*vm));",
+"  var scrap=pr.scrap*(1+(inp.sNoise||0));",
+"  var matCost=(f.cost*vf+mm.cost*vm)*mass/100*(1+scrap/100);",
+"  var energy=mass*pr.eKwh+inp.cureT*inp.cureHr*0.4;",
+"  var mfgCost=matCost*pr.costM*0.6+energy*0.02;",
+"  var cost=matCost+mfgCost;",
+"  /* sustainability */",
+"  var co2=mass*(1+scrap/100)*(wf*f.co2+(1-wf)*mm.co2);",
+"  var recyc=Math.min(10,Math.max(0,f.rec+mm.rec+(inp.process==='rtm'?1:0)));",
+"  var repair=Math.max(1,pr.rep-(t>0.12?2:0));",
+"  var util=100-scrap;",
+"  var lcc=cost+(2000/Math.max(Nf,50))*10+(10-repair)*0.5;",
+"  var sust=Math.min(100,Math.max(0,100-co2/mass*1.5-energy/mass*1.2+recyc*2+util/5-20));",
+"  /* decision metrics */",
+"  var spStr=sAllow/rhoC*1000;",
+"  var spStiff=Elam/rhoC*1000;",
+"  var strCost=sAllow/cost;",
+"  var perf=Math.min(100,Math.max(0,20*Math.min(fos/2.5,2)+15*Math.min(mBuck/BUCK_REQ,2)+",
+"    15*Math.min(Nf/LIFE_REQ,2)/2+10*Math.min(spStr/800,2)+0.2*sust+10*Math.min(600/cost,2)));",
+"  /* governing constraint (incl. economics) */",
+"  var cons=[['stress',fos/2.5],['fatigue',Math.min(Nf/LIFE_REQ,50)],['buckling',mBuck/BUCK_REQ],",
+"    ['deflection',mDefl],['weight',6000/mass],['cost',1200/cost]];",
+"  var gc=cons[0];for(i=1;i<cons.length;i++)if(cons[i][1]<gc[1])gc=cons[i];",
+"  return{vv:vv,mis:mis,cureF:cureF,cureQ:cureQ,E1:E1,E2:E2,G12:G12,nu12:nu12,a1:a1,a2:a2,rhoC:rhoC,",
+"    etaO:etaO,Elam:Elam,resid:resid,quality:quality,sAllow:sAllow,P:P,rt:rt,sigma:sigma,fos:fos,",
+"    Pcr:Pcr,mBuck:mBuck,ac:ac*1000,Nf:Nf,strain:strain,defl:defl,freq:freq,mass:mass,senergy:senergy,",
+"    mode:mode,gc:gc[0],feasible:feasible,cost:cost,matCost:matCost,mfgCost:mfgCost,co2:co2,energy:energy,",
+"    recyc:recyc,repair:repair,util:util,scrap:scrap,lcc:lcc,sust:sust,spStr:spStr,spStiff:spStiff,",
+"    strCost:strCost,perf:perf,mMatrix:mMatrix,mIlss:mIlss,mDefl:mDefl,margins:margins};",
+"}",
+"function nominalMfg(process,matrix){var mm=MATS[matrix];",
+"  return{cureT:mm.Topt,cureHr:2.5,consP:(process==='autoclave'?0.7:(process==='rtm'?0.4:0.25)),coolR:2,",
+"    axial:0,bend:0,R:0,temp:4,env:'seawater',vNoise:0,mNoise:0,sNoise:0};}",
+"var COLS=['design_id','fiber','matrix','geom','layup','mfg_process',",
+"'vf','void_pct','fiber_E_GPa','fiber_strength_MPa','matrix_E_GPa','matrix_strength_MPa',",
+"'E1_GPa','E2_GPa','G12_GPa','nu12','E_lam_GPa','density_kgm3','cte_axial_1e-6C','cte_trans_1e-6C','eta_o',",
+"'n_plies','ply_thickness_mm','total_thickness_mm','symmetric','balanced',",
+"'depth_m','radius_m','thickness_m','rt_ratio','pressure_MPa','axial_load_kN','bending_moment_kNm','load_ratio_R','service_temp_C','environment','a0_mm',",
+"'cure_temp_C','cure_time_hr','consolidation_pressure_MPa','cooling_rate_Cmin','fiber_misalignment_deg','residual_stress_MPa','quality_index',",
+"'sAllow_MPa','sigma_MPa','max_strain_pct','radial_deflection_mm','buckling_pressure_MPa','natural_freq_Hz','strain_energy_kJ',",
+"'fos','ac_mm','Nf_cycles','failure_mode','governing_constraint','feasible',",
+"'mass_kg','material_cost_idx','mfg_cost_idx','cost_idx',",
+"'embodied_CO2_kg','energy_kWh','recyclability_score','repairability_score','material_utilization_pct','scrap_pct','lifecycle_cost_idx','sustainability_index',",
+"'specific_strength_kNm_kg','specific_stiffness_MNm_kg','strength_per_cost','performance_index'];",
+"var IX={};for(var _i=0;_i<COLS.length;_i++)IX[COLS[_i]]=_i;",
+"function makeRow(id,inp){var r=physicsFull(inp);",
+"  var f=FIBERS[inp.fiber],mm=MATS[inp.matrix];",
+"  var plyT=inp.plyT||0.6;var nply=Math.max(4,Math.round(inp.thick*1000/plyT));",
+"  return[id,inp.fiber,inp.matrix,inp.geom,LAYUPS[inp.layup].name,inp.process,",
+"   +inp.vf.toFixed(3),+(r.vv*100).toFixed(2),f.Ef,f.sf,mm.Em,mm.sm,",
+"   +r.E1.toFixed(1),+r.E2.toFixed(2),+r.G12.toFixed(2),+r.nu12.toFixed(3),+r.Elam.toFixed(1),",
+"   Math.round(r.rhoC),+r.a1.toFixed(2),+r.a2.toFixed(1),+r.etaO.toFixed(3),",
+"   nply,plyT,+(inp.thick*1000).toFixed(1),1,1,",
+"   Math.round(inp.depth),+inp.rad.toFixed(3),+inp.thick.toFixed(4),+r.rt.toFixed(2),+r.P.toFixed(2),",
+"   +inp.axial.toFixed(1),+inp.bend.toFixed(1),+inp.R.toFixed(2),+inp.temp.toFixed(1),inp.env,+inp.a0.toFixed(2),",
+"   Math.round(inp.cureT),+inp.cureHr.toFixed(1),+inp.consP.toFixed(2),+inp.coolR.toFixed(1),",
+"   +r.mis.toFixed(2),+r.resid.toFixed(1),+r.quality.toFixed(3),",
+"   +r.sAllow.toFixed(1),+r.sigma.toFixed(1),+r.strain.toFixed(3),+r.defl.toFixed(2),",
+"   +r.Pcr.toFixed(1),Math.round(r.freq),+r.senergy.toFixed(1),",
+"   +r.fos.toFixed(4),+r.ac.toFixed(3),Math.round(r.Nf),r.mode,r.gc,r.feasible,",
+"   +r.mass.toFixed(1),+r.matCost.toFixed(2),+r.mfgCost.toFixed(2),+r.cost.toFixed(2),",
+"   Math.round(r.co2),+r.energy.toFixed(0),+r.recyc.toFixed(1),r.repair,+r.util.toFixed(1),",
+"   +r.scrap.toFixed(1),+r.lcc.toFixed(1),+r.sust.toFixed(1),",
+"   Math.round(r.spStr),Math.round(r.spStiff),+r.strCost.toFixed(1),+r.perf.toFixed(1)];",
+"}",
+"var PLYCOLS=['design_id','ply_number','z_mm','orientation_deg','thickness_mm','fiber','matrix','E_theta_GPa','local_stress_MPa','local_strain_pct','failure_index','is_critical'];",
+"function makePlies(id,inp){",
+"  var r=physicsFull(inp);var f=FIBERS[inp.fiber],mm=MATS[inp.matrix];",
+"  var plyT=inp.plyT||0.6;var nply=Math.max(4,Math.round(inp.thick*1000/plyT));",
+"  if(nply%2)nply++;",
+"  var pat=LAYUPS[inp.layup].pat;var half=nply/2;",
+"  var seq=[];for(var i=0;i<half;i++)seq.push(pat[i%pat.length]);",
+"  var full=seq.concat(seq.slice().reverse());",
+"  var dir=(inp.geom==='sphere')?90:90;",
+"  var eps=r.sigma/(r.Elam*1000);",
+"  var sUD=KD*(f.sf*inp.vf+mm.sm*(1-inp.vf))*r.cureF*(ENVS[inp.env]||0.93)*(1-6*r.vv)*(1-r.mis/60);",
+"  var sT=KD*mm.sm*1.5;",
+"  var out=[];var maxFI=0,maxI=0;",
+"  for(i=0;i<full.length;i++){",
+"    var ang=full[i]-dir;",
+"    var Eth=Etheta(r.E1,r.E2,r.G12,r.nu12,ang);",
+"    var sLoc=Eth*1000*eps;",
+"    var c=Math.cos(ang*Math.PI/180),s=Math.sin(ang*Math.PI/180);",
+"    var allow=sUD*c*c*c*c+sT*s*s*s*s+0.5*(sUD+sT)*2*c*c*s*s;",
+"    var FI=sLoc/allow;",
+"    if(FI>maxFI){maxFI=FI;maxI=i;}",
+"    var z=(-nply/2+i+0.5)*plyT;",
+"    out.push([id,i+1,+z.toFixed(2),full[i],plyT,inp.fiber,inp.matrix,+Eth.toFixed(1),",
+"      +sLoc.toFixed(1),+(eps*100).toFixed(3),+FI.toFixed(3),0]);",
+"  }",
+"  out[maxI][11]=1;",
+"  return out;",
+"}",
+"function featNames(phys){return phys?",
+"  ['V_f','eta_o','ln(r/t)','ln(depth)','ln(radius)','ln(thick)','a0_mm','void_%','misalign','quality','cureT/100','sphere','carbon','glass','Vf*eta']:",
+"  ['V_f','eta_o','r/t','depth','radius','thickness','a0_mm','void_%','misalign','quality','cureT/100','sphere','carbon','glass','Vf*eta'];}",
+"function featFromRow(row,phys){",
+"  var vf=row[6],eta=row[20],rt=row[29],dep=row[26],rad=row[27],th=row[28],a0=row[36],vv=row[7],mis=row[41],q=row[43],ct=row[37]/100;",
+"  var sph=row[3]==='sphere'?1:0,fc=row[1]==='carbon'?1:0,fg=row[1]==='glass'?1:0;",
+"  return phys?[vf,eta,Math.log(rt),Math.log(dep),Math.log(rad),Math.log(th),a0,vv,mis,q,ct,sph,fc,fg,vf*eta]:",
+"    [vf,eta,rt,dep,rad,th,a0,vv,mis,q,ct,sph,fc,fg,vf*eta];",
+"}",
+"function solveSym(A,b){var n=b.length,i,j,k;",
+"  for(i=0;i<n;i++){var p=i;for(j=i+1;j<n;j++)if(Math.abs(A[j][i])>Math.abs(A[p][i]))p=j;",
+"    var tmp=A[i];A[i]=A[p];A[p]=tmp;var tb=b[i];b[i]=b[p];b[p]=tb;",
+"    for(j=i+1;j<n;j++){var f=A[j][i]/A[i][i];for(k=i;k<n;k++)A[j][k]-=f*A[i][k];b[j]-=f*b[i];}}",
+"  var x=new Array(n);for(i=n-1;i>=0;i--){var s=b[i];for(j=i+1;j<n;j++)s-=A[i][j]*x[j];x[i]=s/A[i][i];}return x;",
+"}",
+"function fitRidge(rows,idx,phys,tix){",
+"  var n=idx.length,d=15;",
+"  var X=new Array(n),y=new Float64Array(n);",
+"  for(var i=0;i<n;i++){X[i]=featFromRow(rows[idx[i]],phys);y[i]=Math.log(Math.max(0.02,rows[idx[i]][tix]));}",
+"  var mu=new Float64Array(d),sd=new Float64Array(d);",
+"  for(var j=0;j<d;j++){var s=0;for(i=0;i<n;i++)s+=X[i][j];mu[j]=s/n;}",
+"  for(j=0;j<d;j++){var s2=0;for(i=0;i<n;i++){var dv=X[i][j]-mu[j];s2+=dv*dv;}sd[j]=Math.sqrt(s2/n)||1;}",
+"  var ym=0;for(i=0;i<n;i++)ym+=y[i];ym/=n;",
+"  var A=[],b=new Float64Array(d);",
+"  for(j=0;j<d;j++)A.push(new Float64Array(d));",
+"  for(i=0;i<n;i++){var xs=new Float64Array(d);",
+"    for(j=0;j<d;j++)xs[j]=(X[i][j]-mu[j])/sd[j];",
+"    var yc=y[i]-ym;",
+"    for(j=0;j<d;j++){b[j]+=xs[j]*yc;for(var k=j;k<d;k++)A[j][k]+=xs[j]*xs[k];}}",
+"  var Af=[];for(j=0;j<d;j++){Af.push(Array.from(A[j]));for(var k2=0;k2<j;k2++)Af[j][k2]=A[k2][j];Af[j][j]+=1e-6*n;}",
+"  var w=solveSym(Af,Array.from(b));",
+"  return{w:w,mu:Array.from(mu),sd:Array.from(sd),b0:ym,phys:phys,tix:tix};",
+"}",
+"function predictRow(model,row){",
+"  var x=featFromRow(row,model.phys),p=model.b0;",
+"  for(var j=0;j<x.length;j++)p+=model.w[j]*((x[j]-model.mu[j])/model.sd[j]);",
+"  return Math.exp(p);",
+"}"
+].join("\n");
+(0,eval)(ENGINE);
+
+/* ═════════ WORKER ═════════ */
+const WORKER_SRC = ENGINE + "\n" + [
+"onmessage=function(e){var m=e.data;",
+" if(m.cmd==='generate'){",
+"  var cfg=m.cfg,rng=mulberry32(cfg.seed),rows=[],plies=[],n=cfg.n;",
+"  var CH=2000,done=0;",
+"  function u(a,b){return a+rng()*(b-a);}",
+"  function pick(arr){return arr[Math.floor(rng()*arr.length)];}",
+"  var envs=['seawater','seawater','cold_seawater','tropical_seawater'];",
+"  function chunk(){",
+"   var end=Math.min(done+CH,n);",
+"   for(var i=done;i<end;i++){",
+"    var matrix=pick(cfg.matrices);var mm=MATS[matrix];",
+"    var inp={fiber:pick(cfg.fibers),matrix:matrix,geom:pick(cfg.geoms),layup:pick(cfg.layups),",
+"      process:pick(cfg.procs),",
+"      vf:u(cfg.vf[0],cfg.vf[1]),depth:u(cfg.dep[0],cfg.dep[1]),rad:u(cfg.rad[0],cfg.rad[1]),",
+"      thick:u(cfg.th[0],cfg.th[1]),a0:u(cfg.a0[0],cfg.a0[1]),",
+"      cureT:mm.Topt+u(-45,35),cureHr:u(0.5,6),consP:u(0.1,0.7),coolR:u(0.5,5),",
+"      axial:u(-200,200),bend:u(0,150),R:u(0,0.7),temp:u(2,30),env:pick(envs),",
+"      vNoise:u(-0.3,0.5),mNoise:u(-0.3,0.6),sNoise:u(-0.2,0.3),plyT:u(0.4,0.9)};",
+"    rows.push(makeRow(i+1,inp));",
+"    if(cfg.plyOn&&i<cfg.plyN){var pl=makePlies(i+1,inp);for(var k=0;k<pl.length;k++)plies.push(pl[k]);}",
+"   }",
+"   done=end;postMessage({t:'prog',d:done,n:n});",
+"   if(done<n){setTimeout(chunk,0);}else{",
+"    var feas=0,fosArr=[],modes={};",
+"    for(var k2=0;k2<rows.length;k2++){feas+=rows[k2][56];fosArr.push(rows[k2][51]);",
+"      var md=rows[k2][54];modes[md]=(modes[md]||0)+1;}",
+"    fosArr.sort(function(a,b){return a-b;});",
+"    var med=fosArr[Math.floor(fosArr.length/2)];",
+"    var bins=new Array(24).fill(0);",
+"    for(k2=0;k2<fosArr.length;k2++){var v=Math.min(fosArr[k2],12);bins[Math.min(23,Math.floor(v/0.5))]++;}",
+"    postMessage({t:'gdone',rows:rows,plies:plies,feas:feas,med:med,bins:bins,modes:modes});}",
+"  }",
+"  chunk();",
+" }else if(m.cmd==='train'){",
+"  var rows=m.rows,phys=m.phys,testF=m.testF,tix=m.tix;",
+"  var rng2=mulberry32(m.seed||7),n=rows.length;",
+"  var idx=[];for(var i=0;i<n;i++)idx.push(i);",
+"  for(i=n-1;i>0;i--){var j=Math.floor(rng2()*(i+1));var t2=idx[i];idx[i]=idx[j];idx[j]=t2;}",
+"  var cut=Math.floor(n*(1-testF));",
+"  var trIdx=idx.slice(0,cut),teIdx=idx.slice(cut);",
+"  var model=fitRidge(rows,trIdx,phys,tix);",
+"  var ssr=0,sst=0,ae=0,mx=0,am=0,parity=[];",
+"  for(i=0;i<teIdx.length;i++)am+=rows[teIdx[i]][tix];am/=teIdx.length;",
+"  for(i=0;i<teIdx.length;i++){var a=rows[teIdx[i]][tix],p=predictRow(model,rows[teIdx[i]]);",
+"   var er=a-p;ssr+=er*er;sst+=(a-am)*(a-am);var ab=Math.abs(er);ae+=ab;if(ab>mx)mx=ab;",
+"   if(parity.length<400)parity.push([a,p]);}",
+"  postMessage({t:'tdone',model:model,r2:1-ssr/sst,mae:ae/teIdx.length,",
+"   rmse:Math.sqrt(ssr/teIdx.length),maxe:mx,parity:parity,nTr:trIdx.length,nTe:teIdx.length});",
+" }else if(m.cmd==='curve'){",
+"  var rows=m.rows,phys=m.phys,tix=m.tix;var rng3=mulberry32(99),n=rows.length;",
+"  var idx=[];for(var i=0;i<n;i++)idx.push(i);",
+"  for(i=n-1;i>0;i--){var j=Math.floor(rng3()*(i+1));var t3=idx[i];idx[i]=idx[j];idx[j]=t3;}",
+"  var cut=Math.floor(n*0.8),teIdx=idx.slice(cut),trAll=idx.slice(0,cut);",
+"  var fracs=[0.02,0.05,0.1,0.25,0.5,1.0],out=[];",
+"  for(var f=0;f<fracs.length;f++){",
+"   var k=Math.max(30,Math.floor(trAll.length*fracs[f]));if(k>trAll.length)k=trAll.length;",
+"   var model=fitRidge(rows,trAll.slice(0,k),phys,tix);",
+"   var ssr=0,sst=0,am=0;",
+"   for(i=0;i<teIdx.length;i++)am+=rows[teIdx[i]][tix];am/=teIdx.length;",
+"   for(i=0;i<teIdx.length;i++){var a=rows[teIdx[i]][tix],p=predictRow(model,rows[teIdx[i]]);",
+"    ssr+=(a-p)*(a-p);sst+=(a-am)*(a-am);}",
+"   out.push([k,1-ssr/sst]);}",
+"  postMessage({t:'cdone',pts:out});",
+" }};"
+].join("\n");
+const worker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC],{type:'text/javascript'})));
+
+/* ═════════ STATE + HELPERS ═════════ */
+let DATA=[], PLIES=[], MODEL=null;
+let chFos=null, chHist=null, chParity=null, chCurve=null;
+const $=id=>document.getElementById(id);
+const fmt=(x,d)=>(x==null||isNaN(x))?'—':(+x).toFixed(d);
+const fmtN=n=>n<1?'0':(n>1e6?(n/1e6).toFixed(1)+'M':Math.round(n).toLocaleString());
+const TGT_UNITS={fos:'FoS',embodied_CO2_kg:'kg CO₂',mass_kg:'kg'};
+
+/* ═════════ TABS ═════════ */
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on');$('pg-'+t.dataset.t).classList.add('on');
+  if(t.dataset.t==='ml')$('m-rows').textContent=DATA.length.toLocaleString();
+}));
+
+/* ═════════ PRESETS ═════════ */
+const PRESETS={
+  titan:{fiber:'carbon',matrix:'epoxy',layup:'hoop',proc:'filament_winding',geom:'cyl',vf:0.60,depth:3800,rad:0.70,thick:0.065,a0:1.0},
+  sphere:{fiber:'carbon',matrix:'epoxy',layup:'quasi',proc:'afp',geom:'sphere',vf:0.62,depth:3800,rad:0.70,thick:0.115,a0:1.0},
+  glass:{fiber:'glass',matrix:'vinylester',layup:'cross',proc:'hand_layup',geom:'sphere',vf:0.50,depth:800,rad:0.60,thick:0.060,a0:1.5}
+};
+function applyPreset(){
+  const p=PRESETS[$('preset').value];if(!p)return;
+  $('fiber').value=p.fiber;$('matrix').value=p.matrix;$('layup').value=p.layup;
+  $('proc').value=p.proc;$('geom').value=p.geom;
+  $('vf').value=p.vf;$('depth').value=p.depth;$('rad').value=p.rad;$('thick').value=p.thick;$('a0').value=p.a0;
+  upd();
+}
+
+/* ═════════ DESIGN LAB ═════════ */
+function readDesign(){
+  const mfg=nominalMfg($('proc').value,$('matrix').value);
+  return Object.assign({fiber:$('fiber').value,matrix:$('matrix').value,layup:$('layup').value,
+    process:$('proc').value,geom:$('geom').value,vf:+$('vf').value,depth:+$('depth').value,
+    rad:+$('rad').value,thick:+$('thick').value,a0:+$('a0').value,plyT:0.6},mfg);
+}
+const MODE_LABEL={fiber_failure:'Fiber failure',matrix_cracking:'Matrix cracking',delamination:'Delamination',
+  interlaminar_shear:'Interlaminar shear',buckling:'Buckling',fatigue_failure:'Fatigue',excessive_deflection:'Deflection'};
+function upd(){
+  $('vf-v').textContent=(+$('vf').value).toFixed(2);
+  $('depth-v').textContent=Math.round($('depth').value)+' m';
+  $('rad-v').textContent=(+$('rad').value).toFixed(2)+' m';
+  $('thick-v').textContent=Math.round($('thick').value*1000)+' mm';
+  $('a0-v').textContent=(+$('a0').value).toFixed(1)+' mm';
+  const inp=readDesign(), r=physicsFull(inp);
+  $('o-fos').textContent=fmt(r.fos,2);
+  $('o-nf').textContent=fmtN(r.Nf);
+  $('o-buck').textContent=fmt(r.mBuck,2);
+  $('o-sig').textContent=fmt(r.sigma,0);
+  $('o-sall').textContent=fmt(r.sAllow,0);
+  $('o-ac').textContent=fmt(r.ac,2);
+  $('o-mass').textContent=Math.round(r.mass).toLocaleString();
+  $('o-co2').textContent=Math.round(r.co2).toLocaleString();
+  kpiFlag('k-fos',r.fos>=2.5?'g':(r.fos>=1?'a':'r'));
+  kpiFlag('k-nf',r.Nf>=1000?'g':(r.Nf>0?'a':'r'));
+  kpiFlag('k-buck',r.mBuck>=1.5?'g':(r.mBuck>=1?'a':'r'));
+  const nply=Math.max(4,Math.round(inp.thick*1000/0.6));
+  $('derived').innerHTML='η<sub>o</sub> = <b>'+r.etaO.toFixed(3)+'</b> · E_lam = <b>'+r.Elam.toFixed(0)+' GPa</b> · voids = <b>'+(r.vv*100).toFixed(1)+'%</b><br>'+
+    'plies ≈ <b>'+nply+'</b> @ 0.6 mm · quality = <b>'+r.quality.toFixed(2)+'</b> · σ_res = <b>'+r.resid.toFixed(0)+' MPa</b>';
+  $('mode-pills').innerHTML=
+    '<span class="pill '+(r.feasible?'g':'r')+'">governing: '+(MODE_LABEL[r.mode]||r.mode)+'</span>'+
+    '<span class="pill b">constraint: '+r.gc+'</span>'+
+    '<span class="pill '+(r.sust>50?'g':'a')+'">sustainability '+r.sust.toFixed(0)+'/100</span>';
+  const dn=$('design-note');
+  if(r.ac<=inp.a0) dn.innerHTML='<b>Flaw already critical.</b> a₀ ≥ a_c — one deep excursion can trigger fast fracture with no fatigue warning. This is the Titan condition. Note how residual stress from the cure cycle made it worse.';
+  else if(r.mode==='buckling'&&r.mBuck<1.5) dn.innerHTML='<b>Buckling governs.</b> External pressure hulls fail by instability before strength — and the buckling knockdown depends on manufacturing quality. Better process → higher P_cr.';
+  else if(r.fos<2.5) dn.innerHTML='<b>Strength-limited.</b> Check the chain: layup η<sub>o</sub>, voids, misalignment, and cure quality all knocked down your allowable before geometry even entered.';
+  else dn.innerHTML='<b>Certifiable on paper.</b> '+(MODE_LABEL[r.mode]||r.mode)+' still has the thinnest margin — that is the failure mode to instrument and inspect for.';
+  drawVessel(inp,r);
+  drawFosCurve(inp);
+}
+function kpiFlag(id,cls){const e=$(id);e.classList.remove('g','a','r');e.classList.add(cls);}
+function fosColor(f){return f>=2.5?'#2e9e5b':(f>=1?'#e0a63a':'#d05043');}
+
+function drawVessel(inp,r){
+  const cv=$('vcan'),ctx=cv.getContext('2d'),W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#12435e');g.addColorStop(1,'#06121b');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const sg=ctx.createLinearGradient(0,14,0,H-64);
+  sg.addColorStop(0,'#8fd0e8');sg.addColorStop(1,'#04121c');
+  ctx.fillStyle=sg;ctx.fillRect(14,14,10,H-92);
+  ctx.strokeStyle='rgba(255,255,255,.35)';ctx.strokeRect(14,14,10,H-92);
+  const dy=14+(inp.depth-200)/(6000-200)*(H-106);
+  ctx.fillStyle='#ffd166';ctx.beginPath();ctx.moveTo(26,dy);ctx.lineTo(34,dy-5);ctx.lineTo(34,dy+5);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#cfe8f2';ctx.font='11px ui-monospace,monospace';
+  ctx.fillText(Math.round(inp.depth)+' m',38,dy+4);
+  ctx.fillText('0 m',38,22);ctx.fillText('6000 m',38,H-80);
+  const cx=W*0.55,cy=H*0.42;
+  const wallCol=fosColor(r.fos);
+  ctx.lineWidth=1;
+  if(inp.geom==='sphere'){
+    const R=115, tPx=Math.max(5,Math.min(44,inp.thick/inp.rad*R));
+    ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fillStyle=wallCol;ctx.fill();
+    ctx.beginPath();ctx.arc(cx,cy,R-tPx,0,7);ctx.fillStyle='#dfeef5';ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
+    ctx.strokeStyle='#ffd166';ctx.fillStyle='#ffd166';ctx.lineWidth=1.3;
+    arrow(ctx,cx,cy,cx+(R-tPx)*0.707,cy-(R-tPx)*0.707);
+    ctx.font='11px ui-monospace,monospace';
+    ctx.fillText('r = '+inp.rad.toFixed(2)+' m',cx+16,cy-16);
+    arrowsAround(ctx,cx,cy,R+24,12);
+    ctx.fillStyle='#eaf5fa';ctx.font='bold 13px Segoe UI,sans-serif';
+    ctx.fillText('SPHERE · '+LAYUPS[inp.layup].name+' · σ = P·r/2t',cx-118,cy+R+40);
+  }else{
+    const L=240,R=84, tPx=Math.max(5,Math.min(38,inp.thick/inp.rad*R));
+    capsule(ctx,cx,cy,L,R);ctx.fillStyle=wallCol;ctx.fill();
+    capsule(ctx,cx,cy,L-2*tPx,R-tPx);ctx.fillStyle='#dfeef5';ctx.fill();
+    capsule(ctx,cx,cy,L,R);ctx.strokeStyle='rgba(0,0,0,.35)';ctx.stroke();
+    arrowsCapsule(ctx,cx,cy,L,R);
+    ctx.fillStyle='#eaf5fa';ctx.font='bold 13px Segoe UI,sans-serif';
+    ctx.fillText('CYLINDER · '+LAYUPS[inp.layup].name+' · σ_hoop = P·r/t',cx-136,cy+R+42);
+  }
+  ctx.font='11px ui-monospace,monospace';ctx.fillStyle='#cfe8f2';
+  ctx.fillText('t = '+(inp.thick*1000).toFixed(0)+' mm · '+PROCS[inp.process].name+' · voids '+(r.vv*100).toFixed(1)+'%',cx-116,cy+(inp.geom==='sphere'?155:148));
+  ctx.fillStyle=wallCol;ctx.beginPath();ctx.roundRect(W-158,18,140,52,8);ctx.fill();
+  ctx.fillStyle='#fff';ctx.font='bold 11px Segoe UI,sans-serif';ctx.fillText('FACTOR OF SAFETY',W-146,36);
+  ctx.font='bold 24px ui-monospace,monospace';ctx.fillText(r.fos.toFixed(2),W-146,60);
+  ctx.fillStyle='rgba(255,255,255,.16)';ctx.beginPath();ctx.roundRect(W-158,76,140,26,6);ctx.fill();
+  ctx.fillStyle='#ffd166';ctx.font='bold 10.5px Segoe UI,sans-serif';
+  ctx.fillText((MODE_LABEL[r.mode]||r.mode).toUpperCase()+' GOVERNS',W-150,93);
+  const gy=H-40, gx0=70, gw=W-150;
+  const span=Math.max(r.ac*1.4, inp.a0*1.25, 2);
+  ctx.fillStyle='rgba(255,255,255,.12)';ctx.beginPath();ctx.roundRect(gx0,gy-8,gw,16,8);ctx.fill();
+  const acx=gx0+Math.min(1,r.ac/span)*gw;
+  ctx.fillStyle='rgba(208,80,67,.35)';ctx.beginPath();ctx.roundRect(acx,gy-8,gx0+gw-acx,16,8);ctx.fill();
+  ctx.strokeStyle='#ff7b6b';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(acx,gy-14);ctx.lineTo(acx,gy+14);ctx.stroke();
+  const a0x=gx0+Math.min(1,inp.a0/span)*gw;
+  ctx.fillStyle='#ffd166';ctx.beginPath();ctx.arc(a0x,gy,6,0,7);ctx.fill();
+  ctx.fillStyle='#cfe8f2';ctx.font='11px ui-monospace,monospace';
+  ctx.fillText('flaw gauge:  a\u2080 = '+inp.a0.toFixed(1)+' mm '+(inp.a0>=r.ac?'\u2265':'<')+'  a_c = '+r.ac.toFixed(2)+' mm'+(inp.a0>=r.ac?'  \u2192 CRITICAL':''),gx0,gy-18);
+}
+function capsule(ctx,cx,cy,L,R){
+  ctx.beginPath();
+  ctx.arc(cx-L/2,cy,R,Math.PI/2,3*Math.PI/2);
+  ctx.arc(cx+L/2,cy,R,-Math.PI/2,Math.PI/2);
+  ctx.closePath();
+}
+function arrowsAround(ctx,cx,cy,R,n){
+  ctx.strokeStyle='#8fd0e8';ctx.fillStyle='#8fd0e8';ctx.lineWidth=1.6;
+  for(let i=0;i<n;i++){const a=i/n*2*Math.PI;
+    arrow(ctx,cx+Math.cos(a)*(R+16),cy+Math.sin(a)*(R+16),cx+Math.cos(a)*R,cy+Math.sin(a)*R);}
+}
+function arrowsCapsule(ctx,cx,cy,L,R){
+  ctx.strokeStyle='#8fd0e8';ctx.fillStyle='#8fd0e8';ctx.lineWidth=1.6;
+  for(let i=-2;i<=2;i++){const x=cx+i*L/5;
+    arrow(ctx,x,cy-R-34,x,cy-R-6);arrow(ctx,x,cy+R+34,x,cy+R+6);}
+  arrow(ctx,cx-L/2-R-32,cy,cx-L/2-R-4,cy);
+  arrow(ctx,cx+L/2+R+32,cy,cx+L/2+R+4,cy);
+}
+function arrow(ctx,x1,y1,x2,y2){
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1);
+  ctx.beginPath();ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-7*Math.cos(a-0.4),y2-7*Math.sin(a-0.4));
+  ctx.lineTo(x2-7*Math.cos(a+0.4),y2-7*Math.sin(a+0.4));
+  ctx.closePath();ctx.fill();
+}
+function drawFosCurve(inp){
+  const ts=[],fs=[],bk=[];
+  for(let t=0.02;t<=0.2201;t+=0.005){
+    const r=physicsFull(Object.assign({},inp,{thick:t}));
+    ts.push(Math.round(t*1000));fs.push(+r.fos.toFixed(2));bk.push(+r.mBuck.toFixed(2));
+  }
+  const cur=physicsFull(inp);
+  const data={labels:ts,datasets:[
+    {label:'FoS (strength)',data:fs,borderColor:'#0e7490',backgroundColor:'rgba(14,116,144,.07)',fill:true,pointRadius:0,tension:.25},
+    {label:'Buckling margin',data:bk,borderColor:'#7c3aed',pointRadius:0,tension:.25,borderWidth:1.6},
+    {label:'gate 2.5 / 1.5',data:ts.map(()=>2.5),borderColor:'#c0392b',borderDash:[6,4],pointRadius:0,borderWidth:1.2},
+    {label:'your t',data:ts.map(t=>Math.abs(t-inp.thick*1000)<2.6?cur.fos:null),
+      pointRadius:6,pointBackgroundColor:'#ffd166',borderColor:'transparent',showLine:false}
+  ]};
+  if(chFos){chFos.data=data;chFos.update('none');}
+  else chFos=new Chart($('ch-fos'),{type:'line',data,options:{responsive:true,maintainAspectRatio:false,
+    animation:false,plugins:{legend:{labels:{font:{size:10},boxWidth:14}},
+      title:{display:true,text:'Strength vs buckling across wall thickness (mm)',font:{size:11}}},
+    scales:{y:{beginAtZero:true,suggestedMax:8},x:{ticks:{maxTicksLimit:8}}}}});
+}
+
+/* ═════════ DATASET GENERATOR ═════════ */
+function generate(){
+  const fibers=[],mats=[],procs=[],lays=[],geoms=[];
+  if($('c-carbon').checked)fibers.push('carbon');
+  if($('c-glass').checked)fibers.push('glass');
+  if($('c-aramid').checked)fibers.push('aramid');
+  if($('c-epoxy').checked)mats.push('epoxy');
+  if($('c-vinyl').checked)mats.push('vinylester');
+  if($('c-poly').checked)mats.push('polyester');
+  if($('c-fw').checked)procs.push('filament_winding');
+  if($('c-afp').checked)procs.push('afp');
+  if($('c-auto').checked)procs.push('autoclave');
+  if($('c-rtm').checked)procs.push('rtm');
+  if($('c-hand').checked)procs.push('hand_layup');
+  if($('c-hoop').checked)lays.push('hoop');
+  if($('c-pm55').checked)lays.push('pm55');
+  if($('c-cross').checked)lays.push('cross');
+  if($('c-quasi').checked)lays.push('quasi');
+  if($('c-pm45').checked)lays.push('pm45');
+  if($('c-sph').checked)geoms.push('sphere');
+  if($('c-cyl').checked)geoms.push('cyl');
+  if(!fibers.length||!mats.length||!procs.length||!lays.length||!geoms.length){
+    $('g-status').textContent='Select at least one option in every category.';return;}
+  const n=Math.max(10,Math.floor(+$('g-n').value||0));
+  const cfg={n,seed:+$('g-seed').value||42,fibers,matrices:mats,procs,layups:lays,geoms,
+    vf:[+$('r-vf-a').value,+$('r-vf-b').value],dep:[+$('r-dep-a').value,+$('r-dep-b').value],
+    rad:[+$('r-rad-a').value,+$('r-rad-b').value],th:[+$('r-th-a').value,+$('r-th-b').value],
+    a0:[+$('r-a0-a').value,+$('r-a0-b').value],
+    plyOn:$('g-ply').checked,plyN:Math.max(10,+$('g-plyn').value||300)};
+  window._cfg=cfg;
+  $('gen-btn').disabled=true;$('prog').style.display='block';
+  $('g-status').textContent='Generating '+n.toLocaleString()+' designs…';
+  worker.postMessage({cmd:'generate',cfg});
+}
+worker.onmessage=e=>{
+  const m=e.data;
+  if(m.t==='prog'){$('prog-bar').style.width=(m.d/m.n*100).toFixed(1)+'%';}
+  else if(m.t==='gdone'){
+    DATA=m.rows;PLIES=m.plies;
+    $('gen-btn').disabled=false;$('prog').style.display='none';$('prog-bar').style.width='0%';
+    $('dl-csv').disabled=false;$('dl-meta').disabled=false;$('dl-ply').disabled=!PLIES.length;
+    $('g-status').textContent=DATA.length.toLocaleString()+' designs · '+PLIES.length.toLocaleString()+' ply rows (seed '+window._cfg.seed+', reproducible).';
+    $('h-n').textContent=DATA.length.toLocaleString();
+    $('h-feas').textContent=(m.feas/DATA.length*100).toFixed(1)+'%';
+    $('h-med').textContent=m.med.toFixed(2);
+    $('h-ply').textContent=PLIES.length.toLocaleString();
+    $('m-rows').textContent=DATA.length.toLocaleString();
+    const tot=DATA.length;
+    $('h-modes').innerHTML=Object.entries(m.modes).sort((a,b)=>b[1]-a[1])
+      .map(([k,v])=>'<span class="pill b">'+(MODE_LABEL[k]||k)+' '+(v/tot*100).toFixed(0)+'%</span>').join('');
+    preview();plyPreview();hist(m.bins);
+  }
+  else if(m.t==='tdone'){
+    MODEL=m.model;
+    $('tr-btn').disabled=false;$('lc-btn').disabled=false;
+    const tname=$('m-target').options[$('m-target').selectedIndex].text;
+    $('m-status').textContent='Trained on '+m.nTr.toLocaleString()+' · tested on '+m.nTe.toLocaleString()+(MODEL.phys?' · physics features':' · plain features');
+    $('m-r2').textContent=m.r2.toFixed(3);
+    $('m-mae').textContent=m.mae<10?m.mae.toFixed(2):Math.round(m.mae).toLocaleString();
+    $('m-rmse').textContent=m.rmse<10?m.rmse.toFixed(2):Math.round(m.rmse).toLocaleString();
+    $('m-max').textContent=m.maxe<10?m.maxe.toFixed(1):Math.round(m.maxe).toLocaleString();
+    $('m-mae-u').textContent=TGT_UNITS[COLS[MODEL.tix]]||'units';
+    parity(m.parity);importance();probe();dupd();
+  }
+  else if(m.t==='cdone'){$('lc-btn').disabled=false;curveChart(m.pts);}
+};
+function preview(){
+  const w=$('preview-wrap');w.style.display='block';
+  const pick=[0,1,2,3,4,5,6,7,20,26,29,41,43,44,45,48,51,54,55,56,57,60,61,68,72];
+  const heads=pick.map(p=>COLS[p].replace(/_/g,' '));
+  let h='<thead><tr>'+heads.map((c,i)=>'<th class="'+(i<6?'l':'')+'">'+c+'</th>').join('')+'</tr></thead><tbody>';
+  for(let i=0;i<Math.min(40,DATA.length);i++){
+    h+='<tr>'+pick.map((p,j)=>'<td class="'+(j<6?'l':'')+'">'+DATA[i][p]+'</td>').join('')+'</tr>';
+  }
+  $('preview').innerHTML=h+'</tbody>';
+}
+function plyPreview(){
+  const w=$('ply-wrap');
+  if(!PLIES.length){w.style.display='none';return;}
+  w.style.display='block';
+  let h='<thead><tr>'+PLYCOLS.map((c,i)=>'<th class="'+(i<2?'l':'')+'">'+c.replace(/_/g,' ')+'</th>').join('')+'</tr></thead><tbody>';
+  for(let i=0;i<Math.min(30,PLIES.length);i++){
+    h+='<tr>'+PLIES[i].map((v,j)=>'<td class="'+(j<2?'l':'')+'">'+v+'</td>').join('')+'</tr>';
+  }
+  $('ply-preview').innerHTML=h+'</tbody>';
+}
+function hist(bins){
+  const labels=bins.map((_,i)=>(i*0.5).toFixed(1));
+  const colors=bins.map((_,i)=>{const f=i*0.5;return f>=2.5?'#2e9e5b':(f>=1?'#e0a63a':'#d05043');});
+  const data={labels,datasets:[{data:bins,backgroundColor:colors,borderRadius:2}]};
+  if(chHist){chHist.data=data;chHist.update();}
+  else chHist=new Chart($('ch-hist'),{type:'bar',data,options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},title:{display:true,text:'FoS distribution (clipped at 12)',font:{size:11}}},
+    scales:{x:{ticks:{maxTicksLimit:9}},y:{beginAtZero:true}}}});
+}
+function clearData(){
+  DATA=[];PLIES=[];MODEL=null;
+  $('h-n').textContent='0';$('h-feas').textContent='—';$('h-med').textContent='—';$('h-ply').textContent='0';
+  $('g-status').textContent='No dataset yet.';$('m-rows').textContent='0';
+  $('h-modes').innerHTML='<span class="status">—</span>';
+  $('dl-csv').disabled=true;$('dl-meta').disabled=true;$('dl-ply').disabled=true;$('lc-btn').disabled=true;
+  $('preview-wrap').style.display='none';$('ply-wrap').style.display='none';
+  $('m-status').textContent='Not trained.';
+  ['m-r2','m-mae','m-rmse','m-max'].forEach(id=>$(id).textContent='—');
+  $('imp').innerHTML='<div class="status">Train to reveal.</div>';
+}
+function csvOf(cols,rows,name,statusMsg){
+  $('g-status').textContent='Building '+name+'…';
+  setTimeout(()=>{
+    const lines=[cols.join(',')];
+    for(let i=0;i<rows.length;i++)lines.push(rows[i].join(','));
+    save(new Blob([lines.join('\n')],{type:'text/csv'}),name);
+    $('g-status').textContent=statusMsg;
+  },30);
+}
+function downloadCSV(){if(DATA.length)csvOf(COLS,DATA,'composite_vessel_designs.csv',DATA.length.toLocaleString()+' designs · CSV saved.');}
+function downloadPlies(){if(PLIES.length)csvOf(PLYCOLS,PLIES,'composite_vessel_plies.csv',PLIES.length.toLocaleString()+' ply rows · CSV saved. Join on design_id.');}
+function downloadMeta(){
+  const cfg=window._cfg||{};
+  const dict={};
+  const D=(name,cat,type,unit,desc,gen)=>{dict[name]={category:cat,type:type,unit:unit,meaning:desc,generation:gen};};
+  D('design_id','id','input','-','Unique design identifier; join key to ply table','sequential');
+  D('fiber','material','input','-','Reinforcement fiber: carbon | glass | aramid','uniform choice');
+  D('matrix','material','input','-','Polymer matrix: epoxy | vinylester | polyester','uniform choice');
+  D('geom','geometry','input','-','Hull geometry: sphere | cyl','uniform choice');
+  D('layup','laminate','input','-','Symmetric stacking family, e.g. [+-55]s','uniform choice');
+  D('mfg_process','manufacturing','input','-','filament_winding | afp | autoclave | rtm | hand_layup','uniform choice');
+  D('vf','material','input','-','Fiber volume fraction, range '+JSON.stringify(cfg.vf),'uniform');
+  D('void_pct','manufacturing','derived','%','Void content; process baseline scaled by consolidation pressure and cure time, plus noise','vv0*(1.4-0.9*consP/0.7)*(1+noise)');
+  D('fiber_E_GPa','material','input','GPa','Fiber elastic modulus (lookup)','material table');
+  D('fiber_strength_MPa','material','input','MPa','Fiber tensile strength (lookup)','material table');
+  D('matrix_E_GPa','material','input','GPa','Matrix elastic modulus (lookup)','material table');
+  D('matrix_strength_MPa','material','input','MPa','Matrix tensile strength (lookup)','material table');
+  D('E1_GPa','material','derived','GPa','Longitudinal ply modulus, rule of mixtures E1=Ef*Vf+Em*Vm','micromechanics');
+  D('E2_GPa','material','derived','GPa','Transverse ply modulus, inverse rule of mixtures','micromechanics');
+  D('G12_GPa','material','derived','GPa','In-plane shear modulus, inverse ROM on constituent shear moduli','micromechanics');
+  D('nu12','material','derived','-','Major Poisson ratio, ROM','micromechanics');
+  D('E_lam_GPa','laminate','derived','GPa','Laminate modulus in governing direction via ply compliance transformation, degraded by voids and cure','CLT-lite');
+  D('density_kgm3','material','derived','kg/m3','Composite density incl. void correction','ROM*(1-vv)');
+  D('cte_axial_1e-6C','material','derived','1e-6/C','Longitudinal CTE (Schapery-type)','micromechanics');
+  D('cte_trans_1e-6C','material','derived','1e-6/C','Transverse CTE','micromechanics');
+  D('eta_o','laminate','derived','-','Krenchel orientation efficiency in governing stress direction (hoop for cylinder, biaxial mean for sphere)','mean cos^4(theta-dir)');
+  D('n_plies','laminate','derived','-','Ply count = wall thickness / ply thickness, forced even (symmetric)','round(t/plyT)');
+  D('ply_thickness_mm','laminate','input','mm','Cured ply thickness, 0.4-0.9 typical thick-section winding','uniform');
+  D('total_thickness_mm','geometry','input','mm','Wall thickness in mm','= thickness_m*1000');
+  D('symmetric','laminate','input','0|1','All families here are symmetric','constant 1');
+  D('balanced','laminate','input','0|1','All families here are balanced','constant 1');
+  D('depth_m','loading','input','m','Operating depth, range '+JSON.stringify(cfg.dep),'uniform');
+  D('radius_m','geometry','input','m','Inner radius','uniform');
+  D('thickness_m','geometry','input','m','Wall thickness','uniform');
+  D('rt_ratio','geometry','derived','-','Radius-to-thickness ratio, thin-wall driver','r/t');
+  D('pressure_MPa','loading','derived','MPa','External hydrostatic pressure 1025*9.81*depth','physics');
+  D('axial_load_kN','loading','input','kN','Superimposed axial load (payload, handling), +-200','uniform');
+  D('bending_moment_kNm','loading','input','kNm','Superimposed bending (waves, lifting), 0-150','uniform');
+  D('load_ratio_R','loading','input','-','Fatigue stress ratio min/max, 0-0.7','uniform');
+  D('service_temp_C','loading','input','C','Water temperature 2-30','uniform');
+  D('environment','loading','input','-','seawater | cold_seawater | tropical_seawater; sets moisture knockdown 0.95/0.93/0.88','weighted choice');
+  D('a0_mm','loading','input','mm','Assumed initial flaw (NDE detection limit)','uniform');
+  D('cure_temp_C','manufacturing','input','C','Cure temperature; sampled around matrix optimum -45/+35; deviation reduces cure quality','Topt+U(-45,35)');
+  D('cure_time_hr','manufacturing','input','hr','Cure duration 0.5-6; short cures leave voids and low conversion','uniform');
+  D('consolidation_pressure_MPa','manufacturing','input','MPa','Consolidation/vacuum+autoclave pressure 0.1-0.7; higher pressure suppresses voids','uniform');
+  D('cooling_rate_Cmin','manufacturing','input','C/min','Cool-down rate 0.5-5; faster cooling raises residual stress','uniform');
+  D('fiber_misalignment_deg','manufacturing','derived','deg','Fiber waviness/misalignment; process baseline + noise; knocks down strength','mis0*(1+noise)');
+  D('residual_stress_MPa','manufacturing','derived','MPa','Cure-induced residual stress ~ f(cureT-25, cooling rate, E1); adds to crack-driving stress','0.12*(T-25)*(1+0.12*cool)*(E1/150)');
+  D('quality_index','manufacturing','derived','0-1','Composite manufacturing quality from voids, misalignment, cure; feeds buckling knockdown','1-5vv-mis/50-cure deficit');
+  D('sAllow_MPa','performance','derived','MPa','Design allowable = 0.45*(eta*sf*Vf+sm*Vm)*k_cure*k_env*(1-6vv)*(1-mis/60)','physics');
+  D('sigma_MPa','performance','output','MPa','Governing wall stress incl. axial/bending superposition','thin-wall');
+  D('max_strain_pct','performance','output','%','Membrane strain sigma/E_lam','physics');
+  D('radial_deflection_mm','performance','output','mm','Radial contraction strain*r','physics');
+  D('buckling_pressure_MPa','performance','output','MPa','Critical external pressure with quality-dependent imperfection knockdown k_q=0.25+0.45*quality','shell buckling');
+  D('natural_freq_Hz','performance','output','Hz','Ring breathing mode (1/2pi r)*sqrt(E/rho)','physics');
+  D('strain_energy_kJ','performance','output','kJ','Stored elastic energy sigma^2/(2E)*V','physics');
+  D('fos','performance','output','-','Factor of safety sAllow/sigma; gate >= 2.5','physics');
+  D('ac_mm','performance','output','mm','Critical crack (1/pi)(KIC/(sigma_eff*Y))^2 with sigma_eff = sigma+0.5*residual','LEFM');
+  D('Nf_cycles','performance','output','cycles','Paris-law dive cycles to fracture with delta-sigma=(1-R)*sigma_eff; 0 if a0>=ac; gate >= 1000','Paris integration');
+  D('failure_mode','failure','output','-','argmin margin: fiber_failure | matrix_cracking | delamination | interlaminar_shear | buckling | fatigue_failure | excessive_deflection','margin comparison');
+  D('governing_constraint','failure','output','-','Tightest constraint incl. economics: stress | fatigue | buckling | deflection | weight | cost','normalized margins');
+  D('feasible','failure','output','0|1','All gates pass: FoS>=2.5, Nf>=1000, buckling margin>=1.5, matrix/ILSS/deflection>=1','gates');
+  D('mass_kg','economics','output','kg','Shell mass','vol*rho');
+  D('material_cost_idx','economics','output','rel','Material cost incl. scrap','cost model');
+  D('mfg_cost_idx','economics','output','rel','Process cost + energy cost','cost model');
+  D('cost_idx','economics','output','rel','Total relative cost','sum');
+  D('embodied_CO2_kg','sustainability','output','kg','Cradle-to-gate CO2: mass*(1+scrap)*(wf*CO2_f+wm*CO2_m)','LCA factors');
+  D('energy_kWh','sustainability','output','kWh','Process energy intensity * mass + cure oven energy','energy model');
+  D('recyclability_score','sustainability','derived','0-10','Fiber + matrix recyclability (thermosets low; glass/polyester higher)','lookup');
+  D('repairability_score','sustainability','derived','0-10','Process-dependent, penalized for very thick walls','lookup');
+  D('material_utilization_pct','sustainability','derived','%','100 - scrap','process');
+  D('scrap_pct','sustainability','derived','%','Process scrap rate + noise','process table');
+  D('lifecycle_cost_idx','sustainability','output','rel','Cost + maintenance driven by fatigue life and repairability','model');
+  D('sustainability_index','sustainability','output','0-100','Composite of CO2 intensity, energy, recyclability, utilization','weighted');
+  D('specific_strength_kNm_kg','decision','derived','kN.m/kg','sAllow/density — Ashby axis','ratio');
+  D('specific_stiffness_MNm_kg','decision','derived','MN.m/kg','E_lam/density — Ashby axis','ratio');
+  D('strength_per_cost','decision','derived','MPa/rel','sAllow/cost — value metric','ratio');
+  D('performance_index','decision','output','0-100','Weighted multi-objective score (safety, buckling, fatigue, specific strength, sustainability, cost)','weighted sum');
+  const meta={
+    tool:'Composites Studio',generated:new Date().toISOString(),
+    n_designs:DATA.length,n_ply_rows:PLIES.length,seed:cfg.seed,reproducible:true,
+    sampling:'uniform independent via mulberry32 PRNG; manufacturing sampled conditionally on process and matrix',
+    tables:{designs:'composite_vessel_designs.csv (one row per design, 73 columns)',
+      plies:'composite_vessel_plies.csv (one row per ply, iso-strain membrane CLT; join on design_id)'},
+    correlations_by_construction:[
+      'void_pct depends on process baseline, consolidation pressure, cure time',
+      'fiber_misalignment depends on process',
+      'strength allowable depends on voids, misalignment, cure quality, environment, layup eta_o',
+      'E_lam depends on constituents, Vf, layup, voids, cure',
+      'buckling_pressure depends on E_lam, t/r, and manufacturing quality (imperfection knockdown)',
+      'residual_stress depends on cure temperature and cooling rate and adds to crack-driving stress',
+      'Nf depends on stress, residual stress, flaw size, R-ratio',
+      'CO2/energy/scrap depend on process and material choices'],
+    materials:{fibers:FIBERS,matrices:MATS,processes:PROCS,layups:Object.fromEntries(Object.entries(LAYUPS).map(([k,v])=>[k,v.name]))},
+    physics_constants:{KIC_MPa_sqrtm:KIC,design_allowable_knockdown:KD,paris_C:C_PARIS,paris_m:M_PARIS,Y_geometry:Y_GEO,
+      seawater_density:SW,fatigue_gate_cycles:LIFE_REQ,buckling_gate:BUCK_REQ,fos_gate:2.5},
+    column_dictionary:dict,
+    ply_table_columns:{design_id:'join key',ply_number:'1..n from inner surface',z_mm:'mid-ply position from midplane',
+      orientation_deg:'ply angle from vessel axis (90 = hoop)',thickness_mm:'cured ply thickness',
+      fiber:'as design',matrix:'as design',E_theta_GPa:'ply modulus in governing direction',
+      local_stress_MPa:'iso-strain ply stress = E_theta * laminate strain',local_strain_pct:'laminate membrane strain (equal in all plies)',
+      failure_index:'local stress / angle-dependent ply allowable (max-stress criterion); >1 predicts first ply failure',
+      is_critical:'1 for the ply with the highest failure index'},
+    limitations:'Closed-form thin-wall + iso-strain membrane CLT approximation; no bending-extension coupling, hygrothermal ply stresses, or progressive damage; LEFM with constant Y; educational tool, not a design code.'
+  };
+  save(new Blob([JSON.stringify(meta,null,2)],{type:'application/json'}),'composite_vessel_metadata.json');
+}
+function save(blob,name){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+}
+
+/* ═════════ ML LAB ═════════ */
+function train(){
+  if(DATA.length<50){$('m-status').textContent='Need at least 50 rows — generate a dataset first (tab 2).';return;}
+  $('tr-btn').disabled=true;$('m-status').textContent='Training…';
+  worker.postMessage({cmd:'train',rows:DATA,phys:$('m-phys').checked,testF:+$('m-split').value,
+    tix:IX[$('m-target').value],seed:7});
+}
+function learningCurve(){
+  if(DATA.length<200){$('m-status').textContent='Learning curve needs ≥ 200 rows.';return;}
+  $('lc-btn').disabled=true;
+  worker.postMessage({cmd:'curve',rows:DATA,phys:$('m-phys').checked,tix:IX[$('m-target').value]});
+}
+function parity(pts){
+  const mx=Math.max(...pts.map(p=>Math.max(p[0],p[1])));
+  const lim=mx<20?Math.max(4,mx):mx;
+  const tname=TGT_UNITS[COLS[MODEL.tix]]||'target';
+  const data={datasets:[
+    {label:'held-out designs',data:pts.map(p=>({x:p[0],y:p[1]})),backgroundColor:'rgba(14,116,144,.5)',pointRadius:3},
+    {label:'perfect',type:'line',data:[{x:0,y:0},{x:lim,y:lim}],borderColor:'#c0392b',borderDash:[6,4],pointRadius:0,borderWidth:1.4}]};
+  if(chParity)chParity.destroy();
+  chParity=new Chart($('ch-parity'),{type:'scatter',data,options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{font:{size:11}}}},
+    scales:{x:{title:{display:true,text:'Physics-truth '+tname},min:0,max:lim},
+            y:{title:{display:true,text:'Predicted '+tname},min:0,max:lim}}}});
+}
+function curveChart(pts){
+  const data={labels:pts.map(p=>p[0].toLocaleString()),
+    datasets:[{label:'R² on fixed test set',data:pts.map(p=>+p[1].toFixed(3)),
+      borderColor:'#0e7490',backgroundColor:'rgba(14,116,144,.1)',fill:true,tension:.3,pointRadius:4}]};
+  if(chCurve){chCurve.data=data;chCurve.update();}
+  else chCurve=new Chart($('ch-curve'),{type:'line',data,options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},title:{display:true,text:'training rows →',font:{size:11}}},
+    scales:{y:{suggestedMin:0,suggestedMax:1}}}});
+}
+function importance(){
+  if(!MODEL)return;
+  const names=featNames(MODEL.phys);
+  const abs=MODEL.w.map(Math.abs),mx=Math.max(...abs);
+  const order=abs.map((v,i)=>[v,i]).sort((a,b)=>b[0]-a[0]);
+  let h='';
+  order.forEach(([v,i])=>{
+    h+='<div class="imp"><div class="n">'+names[i]+'</div><div class="b" style="width:'+(v/mx*100).toFixed(0)+'%"></div><div class="x">'+v.toFixed(2)+'</div></div>';
+  });
+  $('imp').innerHTML=h;
+}
+function probeRow(){
+  const rt=+$('q-rt').value,rad=0.7,thick=rad/rt;
+  const mfg=nominalMfg('filament_winding','epoxy');
+  const inp=Object.assign({fiber:'carbon',matrix:'epoxy',layup:$('q-layup').value,process:'filament_winding',
+    geom:$('q-geom').value,vf:+$('q-vf').value,depth:+$('q-dep').value,rad,thick,a0:1.0,plyT:0.6},mfg);
+  return{inp,row:makeRow(0,inp)};
+}
+function probe(){
+  $('q-vf-v').textContent=(+$('q-vf').value).toFixed(2);
+  $('q-rt-v').textContent=(+$('q-rt').value).toFixed(1);
+  $('q-dep-v').textContent=Math.round($('q-dep').value)+' m';
+  const{inp,row}=probeRow();
+  const tix=MODEL?MODEL.tix:IX.fos;
+  const truth=row[tix];
+  const u=TGT_UNITS[COLS[tix]]||'';
+  $('q-tgt-u').textContent=u;$('q-tgt-u2').textContent=u;
+  $('q-true').textContent=truth<100?(+truth).toFixed(2):Math.round(truth).toLocaleString();
+  if(MODEL){
+    const p=predictRow(MODEL,row);
+    $('q-pred').textContent=p<100?p.toFixed(2):Math.round(p).toLocaleString();
+    const err=Math.abs(p-truth),rel=err/Math.max(0.01,Math.abs(truth));
+    $('q-verdict').innerHTML=rel<0.1
+      ?'<span class="pill g">agrees within '+(rel*100).toFixed(0)+'%</span>'
+      :(rel<0.3?'<span class="pill a">off by '+(rel*100).toFixed(0)+'% — check training coverage here</span>'
+               :'<span class="pill r">off by '+(rel*100).toFixed(0)+'% — the model has no business being trusted here</span>');
+  }else{$('q-pred').textContent='—';$('q-verdict').innerHTML='<span class="pill b">train a model first</span>';}
+}
+
+/* ═════════ DEFEND ═════════ */
+function readD(){
+  const mfg=nominalMfg($('d-proc').value,$('d-matrix').value);
+  return Object.assign({fiber:$('d-fiber').value,matrix:$('d-matrix').value,layup:$('d-layup').value,
+    process:$('d-proc').value,geom:$('d-geom').value,vf:+$('d-vf').value,depth:+$('d-dep').value,
+    rad:+$('d-rad').value,thick:+$('d-th').value,a0:+$('d-a0').value,plyT:0.6},mfg);
+}
+function dupd(){
+  $('d-vf-v').textContent=(+$('d-vf').value).toFixed(2);
+  $('d-dep-v').textContent=Math.round($('d-dep').value)+' m';
+  $('d-rad-v').textContent=(+$('d-rad').value).toFixed(2)+' m';
+  $('d-th-v').textContent=Math.round($('d-th').value*1000)+' mm';
+  $('d-a0-v').textContent=(+$('d-a0').value).toFixed(1)+' mm';
+  const inp=readD(),r=physicsFull(inp);
+  $('d-fos').textContent=r.fos.toFixed(2);
+  $('d-nf').textContent=fmtN(r.Nf);
+  $('d-buck').textContent=r.mBuck.toFixed(2);
+  $('d-mass').textContent=Math.round(r.mass).toLocaleString();
+  $('d-sust').textContent=r.sust.toFixed(0);
+  kpiFlag('dk-fos',r.fos>=2.5?'g':(r.fos>=1?'a':'r'));
+  kpiFlag('dk-nf',r.Nf>=1000?'g':(r.Nf>0?'a':'r'));
+  kpiFlag('dk-buck',r.mBuck>=1.5?'g':(r.mBuck>=1?'a':'r'));
+  $('d-pills').innerHTML=
+    '<span class="pill '+(r.feasible?'g':'r')+'">governing: '+(MODE_LABEL[r.mode]||r.mode)+'</span>'+
+    '<span class="pill b">constraint: '+r.gc+'</span>'+
+    '<span class="pill b">CO₂ '+Math.round(r.co2)+' kg</span>'+
+    '<span class="pill b">cost '+r.cost.toFixed(0)+'</span>';
+  let pv=null,tlab='Model says';
+  if(MODEL){pv=predictRow(MODEL,makeRow(0,inp));
+    tlab='Model · '+(TGT_UNITS[COLS[MODEL.tix]]||'');
+    $('d-pred').textContent=pv<100?pv.toFixed(2):Math.round(pv).toLocaleString();}
+  else $('d-pred').textContent='—';
+  $('d-pred-l').textContent=tlab;
+  const ok=r.feasible===1;
+  let mnote='';
+  if(pv!==null&&MODEL.tix===IX.fos){const gap=pv-r.fos;
+    mnote=Math.abs(gap)>0.5
+      ?'<br><span class="pill a">surrogate off by '+(gap>0?'+':'')+gap.toFixed(2)+' FoS — cite the physics, not the model</span>'
+      :'<br><span class="pill b">surrogate agrees within '+Math.abs(gap).toFixed(2)+' FoS</span>';}
+  $('d-verdict').innerHTML=ok
+    ?'<div class="verd ok"><b>✓ Certifiable on paper.</b> All gates pass; '+(MODE_LABEL[r.mode]||r.mode)+' has the thinnest margin. Now write the defense.'+mnote+'</div>'
+    :'<div class="verd no"><b>✗ Not defensible yet.</b> '+(r.fos<2.5?'FoS below 2.5. ':'')+(r.Nf<1000?'Fatigue below 1000 cycles. ':'')+(r.mBuck<1.5?'Buckling margin below 1.5. ':'')+(r.mMatrix<1?'Matrix cracking. ':'')+(r.mIlss<1?'Interlaminar shear. ':'')+'Fix the mechanics first.'+mnote+'</div>';
+}
+function exportBrief(){
+  const inp=readD(),r=physicsFull(inp);
+  const pv=MODEL?predictRow(MODEL,makeRow(0,inp)):null;
+  const txt=[
+'COMPOSITES STUDIO — DESIGN BRIEF','Generated: '+new Date().toLocaleString(),'',
+'FINAL DESIGN',
+'  Fiber: '+inp.fiber+'   Matrix: '+inp.matrix+'   Layup: '+LAYUPS[inp.layup].name+'   Process: '+PROCS[inp.process].name,
+'  Geometry: '+inp.geom+'   V_f = '+inp.vf.toFixed(2),
+'  Depth = '+Math.round(inp.depth)+' m   r = '+inp.rad.toFixed(2)+' m   t = '+(inp.thick*1000).toFixed(0)+' mm   a0 = '+inp.a0.toFixed(1)+' mm','',
+'MANUFACTURING STATE (nominal)',
+'  Voids = '+(r.vv*100).toFixed(1)+' %   Misalignment = '+r.mis.toFixed(1)+' deg   Quality = '+r.quality.toFixed(2),
+'  Residual stress = '+r.resid.toFixed(0)+' MPa','',
+'PHYSICS VERDICT',
+'  Wall stress = '+r.sigma.toFixed(0)+' MPa   Allowable = '+r.sAllow.toFixed(0)+' MPa   FoS = '+r.fos.toFixed(2)+' (gate 2.5)',
+'  Buckling: P_cr = '+r.Pcr.toFixed(1)+' MPa   margin = '+r.mBuck.toFixed(2)+' (gate 1.5)',
+'  Fracture: a_c = '+r.ac.toFixed(2)+' mm   N_f = '+Math.round(r.Nf).toLocaleString()+' cycles (gate 1000)',
+'  Governing failure mode: '+r.mode+'   Governing constraint: '+r.gc,
+'  Mass = '+Math.round(r.mass)+' kg   Cost = '+r.cost.toFixed(1)+'   CO2 = '+Math.round(r.co2)+' kg   Sustainability = '+r.sust.toFixed(0)+'/100',
+'  Status: '+(r.feasible?'CERTIFIABLE ON PAPER':'NOT DEFENSIBLE'),'',
+'SURROGATE COMPARISON',
+'  Model prediction ('+(MODEL?COLS[MODEL.tix]:'none')+') = '+(pv===null?'(no model trained)':(pv<100?pv.toFixed(2):Math.round(pv))),'',
+'DEFENSE',
+'1) '+($('ans1').value||'(unanswered)'),'',
+'2) '+($('ans2').value||'(unanswered)'),'',
+'3) '+($('ans3').value||'(unanswered)'),'',
+'Physics: micromechanics + Krenchel laminate + manufacturing knockdowns + thin-wall + shell buckling + LEFM/Paris',
+'Educational tool — not a design code.'
+  ].join('\n');
+  save(new Blob([txt],{type:'text/plain'}),'design_brief.txt');
+}
+
+/* init */
+upd();probe();dupd();
+</script>
+</body>
+</html>
