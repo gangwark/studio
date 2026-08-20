@@ -95,6 +95,17 @@ td.z{color:var(--zero)}
 .checkrow{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px}
 .checkrow input{accent-color:var(--ink)}
 .msg-bad{color:var(--bad);font-size:12px;line-height:1.5;font-weight:500}
+
+.sh{font-size:10.5px;color:var(--ink-soft);line-height:1.45;margin:-2px 0 7px 0;grid-column:1/-1}
+.dg-row label{flex:1.35}
+.dg-row input[type=number]{width:78px}
+.dg-row select{flex:1;padding:5px 7px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:var(--paper)}
+.infobox{background:#F2F6FB;border:1px solid #C9D8EA;border-left:3px solid var(--compression);border-radius:4px;padding:9px 11px;font-size:11.5px;line-height:1.55;color:var(--ink)}
+.warnbox{font-size:11.5px;line-height:1.5}
+.warnbox .w{color:var(--warn);margin-bottom:4px}
+.warnbox .e{color:var(--bad);margin-bottom:4px;font-weight:500}
+.warnbox .ok{color:var(--ok)}
+
 /* ---------- dataset generator modal ---------- */
 .modal-back{position:fixed;inset:0;background:rgba(23,38,59,.45);display:none;align-items:center;justify-content:center;z-index:50}
 .modal{background:#fff;border:2px solid var(--ink);border-radius:8px;width:min(740px,94vw);max-height:92vh;overflow-y:auto;padding:20px 24px}
@@ -146,6 +157,7 @@ td.z{color:var(--zero)}
       <option value="cantilever">Cantilever truss</option>
       <option value="gunt">GUNT SE 200.01 demo shape</option>
     </select>
+    <button class="hbtn" id="plabBtn" style="border-color:var(--ink);font-weight:600">Truss Build Lab</button>
     <button class="hbtn" id="btnData" style="border-color:var(--ink);font-weight:600">Dataset</button>
     <button class="hbtn" id="btnClear">Clear</button>
     <button class="hbtn" id="btnSave">Save JSON</button>
@@ -1740,6 +1752,1927 @@ $('dgDlMembers').addEventListener('click', () => membersCsv && dl(membersCsv, 't
 $('dgDlMeta').addEventListener('click', () => metadataJson && dl(metadataJson, 'dataset_metadata.json', 'application/json'));
 })();
 
+</script>
+
+<div id="plabOverlay" style="display:none;position:fixed;inset:0;z-index:80;background:var(--bench);flex-direction:column;font-family:var(--body)">
+  <div style="display:flex;align-items:center;background:#fff;border-bottom:2px solid var(--ink);flex-shrink:0">
+    <div style="padding:10px 18px;border-right:1px solid var(--line)">
+      <div style="font-family:var(--display);font-size:17px;font-weight:700;letter-spacing:.04em">TRUSS BUILD LAB</div>
+      <div style="font-size:10.5px;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase">Design → Build → Load → Fail → Optimize</div>
+    </div>
+    <div id="plabLedger" style="display:flex;align-items:stretch;flex:1;overflow-x:auto"></div>
+    <div style="padding:0 14px;display:flex;gap:8px">
+      <button class="hbtn" id="plabSetup">Settings</button>
+      <button class="hbtn" id="plabExit" style="border-color:var(--ink);font-weight:600">Exit lab</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex:1;min-height:0">
+    <div style="width:62px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;padding:8px 0;gap:2px;flex-shrink:0">
+      <button class="tool active" data-pmode="joint" title="Add or remove a joint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg><span>Joint</span></button>
+      <button class="tool" data-pmode="member" title="Connect two joints"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="5" r="2.5"/><path d="M7 17L17 7"/></svg><span>Member</span></button>
+      <button class="tool" data-pmode="assign" title="Set a member's material and connection"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7-4-4-7 7v4z"/><path d="M5 19h4"/></svg><span>Assign</span></button>
+      <button class="tool" data-pmode="support" title="Move a support along the bottom row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="6" r="2.5"/><path d="M12 8.5L5 18h14z M3 21h18"/></svg><span>Support</span></button>
+      <button class="tool" data-pmode="erase" title="Remove a member or joint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg><span>Erase</span></button>
+      <div class="tool-sep"></div>
+      <button class="tool" id="plabUndo" title="Undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 010 10h-3"/></svg><span>Undo</span></button>
+    </div>
+
+    <div style="flex:1;position:relative;min-width:0">
+      <div id="plabQuick" style="position:absolute;top:8px;left:10px;right:10px;display:flex;gap:8px;align-items:center;z-index:3;background:rgba(247,248,245,.95);border:1px solid var(--line);border-radius:5px;padding:6px 10px;font-size:12px;flex-wrap:wrap">
+        <label style="color:var(--ink-soft)">Design</label>
+        <select id="qDesign" style="padding:3px 6px;font-size:12px"><option value="general" selected>General truss</option><option value="bridge">Bridge truss</option><option value="roof">Roof truss</option><option value="custom">Custom</option></select>
+        <label style="color:var(--ink-soft)" title="Changing this re-materialises every member; use the Assign tool for individual members">Member material</label>
+        <select id="qMat" style="padding:3px 6px;font-size:12px"><option value="popsicle">Popsicle stick</option><option value="balsa">Balsa wood</option><option value="string">String tie</option></select>
+        <label style="color:var(--ink-soft)">Connection</label>
+        <select id="qConn" style="padding:3px 6px;font-size:12px"><option value="glue">Glued lap</option><option value="lash">String lashing</option><option value="pin">Ideal pin</option></select>
+        <label style="color:var(--ink-soft)">Loading</label>
+        <select id="qLoad" style="padding:3px 6px;font-size:12px"><option value="plate">Instron plate</option><option value="hook">Hanging hook</option></select>
+        <span id="qHookWrap" style="display:none"><label style="color:var(--ink-soft)">Hook load N</label>
+          <input type="number" id="qHook" step="50" style="width:78px;font-family:var(--mono);font-size:12px;padding:3px 5px;border:1px solid var(--line);border-radius:4px"></span>
+      </div>
+      <canvas id="plabCanvas" style="display:block;width:100%;height:100%"></canvas>
+      <div class="hint" id="plabHint">Click grey dots to place joints — everything mirrors about mid-span automatically.</div>
+      <div class="legend"><span><i style="background:var(--tension)"></i>Pulled</span><span><i style="background:var(--compression)"></i>Squeezed</span><span><i style="background:#D2691E"></i>Near capacity</span><span><i style="background:#B3261E"></i>Failing</span></div>
+    </div>
+
+    <div style="width:360px;background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0">
+      <div class="panel" id="qRampWrap" style="background:#FFFDF6">
+        <h2>Instron load test</h2>
+        <div class="note" style="margin-bottom:8px">The ram lowers and the load climbs from zero. Watch the members change colour, the truss deflect, and the first failure occur.</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+          <button class="chipbtn" id="rampRun" style="font-weight:700">Run load test</button>
+          <button class="chipbtn" id="rampReset">Reset test</button>
+          <button class="chipbtn" id="plabResetDesign">Reset design</button>
+          <button class="chipbtn" id="plabMakeSym">Make symmetric</button>
+          <button class="chipbtn" id="plabClearTruss">Clear truss</button>
+          <select id="rampSpeed" style="padding:4px 6px;font-size:12px"><option value="0.5">Slow</option><option value="1" selected>Normal</option><option value="2.5">Fast</option></select>
+        </div>
+        <input type="range" id="rampSlider" min="0" max="100" value="0" style="width:100%">
+        <div class="note">Drag to hold the load at any point.</div>
+        <canvas id="plabGraph" style="width:100%;height:150px;margin-top:8px;border:1px solid var(--line);border-radius:4px"></canvas>
+      </div>
+      <div class="panel" style="background:#FFFDF6">
+        <h2>Structural response</h2>
+        <div id="plabResult"></div>
+      </div>
+      <div class="panel">
+        <h2>Physical test configuration</h2>
+        <div class="infobox">
+          In the laboratory the finished truss rests on <b>two supports</b> a fixed distance apart, and the
+          <b>Instron compression plate is lowered onto it from above</b> until the structure fails. This model
+          represents that same arrangement. The predicted capacity is an <b>analytical estimate</b> built on the
+          assumptions in Settings, and must be validated by building and testing the truss.
+        </div>
+      </div>
+      <div class="panel"><h2>Model assumptions</h2><div id="plabAssume"></div></div>
+      <div class="panel"><h2>Constructability check</h2><div id="plabBuildable" class="warnbox"></div></div>
+      <div class="panel"><h2>Material budget</h2><div id="plabBudget"></div></div>
+      <div class="panel">
+        <h2>Optimize design</h2>
+        <div class="note" style="margin-bottom:8px">Tries one small <b>symmetric</b> change at a time — move a joint pair, change a member's material, swap a member pair, add or remove a joint pair — keeping only changes that help. Aims first at the target load, then at fewer sticks and less weight.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <button class="chipbtn" id="optAnalyze">Analyze current</button>
+          <button class="chipbtn" id="optRun" style="font-weight:700">Optimize design</button>
+          <button class="chipbtn" id="optPause" disabled>Pause</button>
+          <button class="chipbtn" id="optReset" disabled>Reset</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;font-size:12px">
+          <label style="color:var(--ink-soft)">Iterations</label>
+          <input type="number" id="optIters" value="250" step="50" min="20" style="width:66px;font-family:var(--mono);font-size:12px;padding:4px 6px;border:1px solid var(--line);border-radius:4px">
+          <label style="color:var(--ink-soft)">Speed</label>
+          <select id="optSpeed" style="padding:4px 6px;font-size:12px"><option value="90">Slow</option><option value="40" selected>Normal</option><option value="10">Fast</option></select>
+        </div>
+        <div class="progress" style="margin-bottom:8px"><i id="optBar"></i></div>
+        <div id="optStats" class="note"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button class="chipbtn" id="optDlLog">Download log (CSV)</button>
+          <button class="chipbtn" id="optAccept" disabled>Accept candidate</button>
+          <button class="chipbtn" id="optRevert" disabled>Revert to my design</button>
+        </div>
+        <div id="optCompare"></div><div id="optHist"></div>
+      </div>
+      <div class="panel">
+        <h2>Saved designs</h2>
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+          <button class="chipbtn" id="plabSave">Save this design</button>
+          <button class="chipbtn" id="plabSavedCsv">Saved designs (CSV)</button>
+          <button class="chipbtn" id="plabClearHist">Clear</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+          <button class="chipbtn" id="plabExportDesign">Save to file (JSON)</button>
+          <button class="chipbtn" id="plabImportBtn">Open design file</button>
+          <input type="file" id="plabImportFile" accept=".json,application/json" style="display:none">
+        </div>
+        <div id="plabHistory" class="note">Nothing saved yet.</div>
+      </div>
+      <div class="panel">
+        <h2>Take it to the lab</h2>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="chipbtn" id="plabSheet">Build sheet (CSV)</button>
+          <button class="chipbtn" id="plabCompare">Comparison sheet (CSV)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="modal-back" id="plabSetBack">
+    <div class="modal" style="width:min(740px,95vw)">
+      <h2>Lab settings</h2>
+      <div class="dg-sub">Everything here is live — change a value and the truss on the board updates immediately. Every setting is an assumption you can inspect and challenge.</div>
+
+      <div class="dg-sec">Structure and fixture</div>
+      <div class="dg-grid">
+        <div class="dg-row"><label>Design type</label>
+          <select id="psDesign"><option value="general" selected>General truss (Warren)</option><option value="bridge">Bridge truss (Pratt)</option><option value="roof">Roof truss (king post)</option><option value="custom">Custom — I build it</option></select></div>
+        <div class="sh">Picking General, Bridge or Roof rebuilds the geometry immediately. Custom keeps whatever is on the board so you can build your own; any manual edit switches to Custom automatically.</div>
+        <div class="dg-row"><label>Support span (mm)</label><input type="number" id="psSpan" step="10" min="1"></div>
+        <div class="sh">Distance between supports, matching the laboratory fixture. Type any value from 10 mm to 50 m — 1200 mm is perfectly valid. Supports never move during optimization; use the Support tool to shift them within the span.</div>
+        <div class="dg-row"><label>Grid divisions across span</label><input type="number" id="psCols" min="4" step="2"></div>
+        <div class="sh">Joints sit on this grid. Type any even number from 4 upwards — 50 or more is fine, though a very fine grid makes the board slower to redraw and needs many members to stay determinate. Odd numbers are rounded up so mid-span stays on a grid line.</div>
+        <div class="dg-row"><label>Grid rows (height)</label><input type="number" id="psRows" min="2"></div>
+        <div class="sh">How tall the design space is. A deeper truss carries more load for the same member force but uses more material.</div>
+        <div class="dg-row"><label>Sticks laminated per member</label><input type="number" id="psLam" min="1"></div>
+        <div class="sh">Gluing sticks face to face multiplies area by n and out-of-plane stiffness by n³ — and multiplies sticks consumed.</div>
+        <div class="dg-row"><label>Parallel truss planes</label><input type="number" id="psPlanes" min="1"></div>
+        <div class="sh">How many identical frames the specimen has side by side. Two planes share the load, so capacity doubles — but so does the stick count.</div>
+      </div>
+
+      <div class="dg-sec">Member material (applies to new members and the Assign tool)</div>
+      <div class="dg-grid">
+        <div class="dg-row"><label>Material</label>
+          <select id="psNewMat"><option value="popsicle">Popsicle stick (birch)</option><option value="balsa">Balsa 1/8 in</option><option value="string">String tie</option></select></div>
+        <div class="sh">Every member stores its own material. Pick one here, then draw members or use the Assign tool to change existing ones. Editing any property below overrides that material everywhere it is used.</div>
+        <div class="dg-row"><label>Connection type</label>
+          <select id="psNewConn"><option value="glue">Glued lap</option><option value="lash">String lashing</option><option value="pin">Ideal pin</option></select></div>
+        <div class="sh">How members are joined. A glued lap fails in shear across the overlap; a lashing has a fixed capacity; an ideal pin imposes no joint limit at all (useful for seeing how much the joints are costing you).</div>
+      </div>
+      <div class="dg-grid" id="psWoodRow">
+        <div class="dg-row"><label>Piece length (mm)</label><input type="number" id="psL" step="1"></div>
+        <div class="sh">Longest member you can cut from one piece of this material.</div>
+        <div class="dg-row"><label>Width (mm)</label><input type="number" id="psW" step="0.1"></div>
+        <div class="sh">Broad dimension, lying in the plane of the truss. Sets area and the strong bending axis.</div>
+        <div class="dg-row"><label>Thickness (mm)</label><input type="number" id="psT" step="0.1"></div>
+        <div class="sh">Thin dimension, out of plane. Area A = w × t; in-plane inertia I = t·w³/12; out-of-plane I = w·t³/12, about 25× smaller.</div>
+        <div class="dg-row"><label>Density (kg/m³)</label><input type="number" id="psRho" step="10"></div>
+        <div class="sh">Used to work out the mass of the finished truss.</div>
+        <div class="dg-row"><label>Elastic modulus (GPa)</label><input type="number" id="psE" step="0.1"></div>
+        <div class="sh">Stiffness along the grain. Buckling capacity is proportional to E, and deflection is inversely proportional to it.</div>
+        <div class="dg-row"><label>Tensile strength (MPa)</label><input type="number" id="psSt" step="1"></div>
+        <div class="sh">Stress at which the wood tears when pulled.</div>
+        <div class="dg-row"><label>Compressive strength (MPa)</label><input type="number" id="psSc" step="1"></div>
+        <div class="sh">Stress at which the wood crushes when squeezed. Governs short members; long ones buckle first.</div>
+      </div>
+      <div class="dg-grid" id="psStringRow" style="display:none">
+        <div class="dg-row"><label>String breaking load (N)</label><input type="number" id="psBreak" step="10"></div>
+        <div class="sh">String carries tension only. A string that ends up squeezed goes slack, and the model rejects the design.</div>
+      </div>
+
+      <div class="dg-sec">Joints and buckling — the assumptions that matter most</div>
+      <div class="dg-grid">
+        <div class="dg-row"><label>Joint overlap length (mm)</label><input type="number" id="psOv" step="1"></div>
+        <div class="sh">How far two members lap at a glued joint. Longer laps give much stronger joints — the cheapest way to raise capacity.</div>
+        <div class="dg-row"><label>Glue-line shear strength (MPa)</label><input type="number" id="psTau" step="0.5"></div>
+        <div class="sh">Shear the glued interface takes before letting go. For PVA on wood the wood surface usually fails first, around 4–7 MPa.</div>
+        <div class="dg-row"><label>Resulting joint capacity (N)</label><input type="number" id="psJcap" disabled></div>
+        <div class="sh">Computed as width × overlap × shear strength for the selected material. Worth calibrating with a simple pull test — it directly sets what a tension member can carry.</div>
+        <div class="dg-row"><label>String lashing capacity (N)</label><input type="number" id="psLash" step="10"></div>
+        <div class="sh">Capacity of a lashed connection, used when a member's connection type is String lashing.</div>
+        <div class="dg-row"><label>Joint limit applies to</label>
+          <select id="psJMode"><option value="tension">Tension members only</option><option value="both">Tension and compression</option></select></div>
+        <div class="sh"><b>Important.</b> A pulled member transfers force through the glue, so the joint limit applies. A squeezed member bears end-on and does not rely on glue shear, so normally it should not. Choosing "both" is conservative and was the single biggest reason earlier versions predicted very low capacities.</div>
+        <div class="dg-row"><label>Buckling axis</label>
+          <select id="psAxis"><option value="in">In-plane (out-of-plane braced)</option><option value="out">Out-of-plane (unbraced)</option></select></div>
+        <div class="sh">A lone flat truss buckles sideways using the small inertia. Two cross-braced planes restrain each other, so buckling happens in-plane using an inertia about 25× larger. Match how the specimen is really built.</div>
+        <div class="dg-row"><label>Effective length factor K</label><input type="number" id="psK" step="0.05" min="0.1"></div>
+        <div class="sh">Buckling capacity is π²EI/(KL)². K = 1.0 assumes freely rotating pinned ends; 0.5 assumes fully fixed. Used only when the box below is unticked.</div>
+        <div class="dg-row"><label>Take K from connection type</label><input type="checkbox" id="psUseConnK" checked style="margin-right:auto"></div>
+        <div class="sh">When ticked, each member's K follows its connection: glued lap 0.85, string lashing 0.95, ideal pin 1.00. This is how connection type reaches the buckling calculation as well as the tension capacity.</div>
+      </div>
+
+      <div class="dg-sec">Loading</div>
+      <div class="dg-grid">
+        <div class="dg-row"><label>Load type</label>
+          <select id="psLoad"><option value="plate">Instron compression plate</option><option value="hook">Hanging hook</option></select></div>
+        <div class="sh">The plate is lowered from above and bears on every joint at the top, sharing the load. A hook applies everything at one point, roughly doubling peak member force for the same total load.</div>
+        <div class="dg-row"><label>Hanging hook load (N)</label><input type="number" id="psHook" step="50"></div>
+        <div class="sh">The weight hung from the hook. This is the load you apply — set it yourself. With plate loading the ram instead ramps from zero to failure, which you drive with the Run load test control.</div>
+        <div class="dg-row"><label>Plate contact tolerance (mm)</label><input type="number" id="psPtol" step="0.5"></div>
+        <div class="sh">A flat plate only touches joints within this height of the highest one. A level top chord shares load between many joints; a peaked truss concentrates it on the apex.</div>
+        <div class="dg-row"><label>Target load (N)</label><input type="number" id="psTarget" step="1"></div>
+        <div class="sh">What students are aiming for. 4448.22 N = 1000 lbf. Historical results in this laboratory have reached roughly 700 lbf (3114 N) and sometimes more.</div>
+      </div>
+
+      <div class="dg-sec">Stick budget</div>
+      <div class="dg-grid">
+        <div class="dg-row"><label>Budget rule</label>
+          <select id="psBud"><option value="count">Count of sticks</option><option value="length">Total length of stock</option></select></div>
+        <div class="sh">Popsicle projects normally limit the number of sticks; competitions such as the ASCE balsa event limit total stock length. Both sets of numbers stay editable; the rule chosen here is the one enforced.</div>
+        <div class="dg-row"><label>Minimum sticks</label><input type="number" id="psMin" min="0"></div>
+        <div class="sh">Lower limit so an optimized design cannot become trivially small. Set to 0 to remove the floor.</div>
+        <div class="dg-row"><label>Maximum sticks</label><input type="number" id="psMax" min="1"></div>
+        <div class="sh">Total sticks available, counting every plane and lamination layer: members × lamination × planes.</div>
+        <div class="dg-row"><label>Stock pieces allowed</label><input type="number" id="psPieces" min="1"></div>
+        <div class="sh">For the total-length rule: how many full pieces may be cut up.</div>
+        <div class="dg-row"><label>Stock piece length (mm)</label><input type="number" id="psStock" step="0.1"></div>
+        <div class="sh">Length of one piece as supplied. 914.4 mm = 36 in.</div>
+        <div class="dg-row"><label>String allowance (m)</label><input type="number" id="psStr" step="1"></div>
+        <div class="sh">String ties carry tension only, weigh almost nothing and do not consume the stick budget.</div>
+      </div>
+
+      <div class="dg-sec">Constructability and display</div>
+      <div class="dg-grid">
+        <div class="dg-row"><label>Shortest practical member (mm)</label><input type="number" id="psMinLen" step="5"></div>
+        <div class="sh">Members shorter than this are awkward to cut and glue. Reported as advice, not a failure.</div>
+        <div class="dg-row"><label>Most members at one joint</label><input type="number" id="psMaxDeg" min="3"></div>
+        <div class="sh">Crowded joints are hard to glue cleanly. Reported as advice.</div>
+        <div class="dg-row"><label>Colour members by</label>
+          <select id="psColour"><option value="force">Tension / compression</option><option value="util">How close to failing</option></select></div>
+        <div class="sh">Force type shows what each member is doing; utilisation shows green through amber to red as members approach their capacity.</div>
+      </div>
+      <div class="dg-checks" style="margin-top:6px">
+        <label><input type="checkbox" id="psSym" checked>Enforce symmetry about mid-span</label>
+        <label><input type="checkbox" id="psDefl" checked>Show deformed shape (exaggerated)</label>
+      </div>
+      <div class="sh" style="margin-top:2px">Symmetry keeps both your edits and the optimizer producing realistic bridge-like structures rather than lopsided ones.</div>
+
+      <div class="dg-actions">
+        <button class="dg-btn" id="psApply">Apply</button>
+        <button class="dg-btn secondary" id="psApplyRebuild">Apply &amp; rebuild geometry</button>
+        <button class="dg-btn secondary" id="psClose">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+/* ============ SINGLE SOURCE OF TRUTH ============ */
+const LBF=4.4482216152605, IN=25.4;
+
+const MATLIB={
+  popsicle:{key:'popsicle',label:'Popsicle stick (birch)',kind:'stick',
+    stickL:0.114,w:0.010,t:0.002,rho:650,E:13e9,sigT:70e6,sigC:40e6},
+  balsa:{key:'balsa',label:'Balsa 1/8 in',kind:'stick',
+    stickL:0.9144,w:0.003175,t:0.003175,rho:160,E:3.5e9,sigT:20e6,sigC:12e6},
+  string:{key:'string',label:'String tie',kind:'string',
+    stickL:9.9,w:0.001,t:0.001,rho:1200,E:2e9,breaking:150}
+};
+const CONNLIB={
+  // K = effective-length factor implied by how much the joint restrains rotation
+  glue:{key:'glue',label:'Glued lap',mode:'shear',K:0.85},   // gusseted: partial restraint
+  lash:{key:'lash',label:'String lashing',mode:'fixed',K:0.95}, // nearly free to rotate
+  pin:{key:'pin',label:'Ideal pin',mode:'none',K:1.0}        // free rotation, no joint limit
+};
+
+const S={
+  /* geometry / fixture */
+  design:'general', span:0.3048, cols:12, rows:6, supL:0, supR:12, symmetric:true,
+  /* member defaults for new members */
+  newMat:'popsicle', newConn:'glue',
+  /* section & lamination (applies to stick materials) */
+  lam:1, planes:2,
+  /* joint & buckling assumptions */
+  overlap:0.025, tau:5e6, lashCap:120, jointMode:'tension', axis:'in', K:0.85, useConnK:true,
+  /* loading */
+  loadType:'plate', plateTol:0.0015, hookLoad:500, target:4448.22,
+  /* budget */
+  budget:'count', minSticks:18, maxSticks:40, pieces:3, stock:0.9144, strAllow:15,
+  /* constructability */
+  minLen:0.020, maxDeg:6,
+  /* model */
+  nodes:new Set(), members:[],
+  /* material property overrides (custom) */
+  ov:{}
+};
+const pitch=()=>S.span/S.cols;
+const key=(c,r)=>c+','+r, parse=k=>k.split(',').map(Number);
+const xyOf=k=>{const[c,r]=parse(k);return{x:c*pitch(),y:r*pitch()};};
+const SUPL=()=>key(S.supL,0), SUPR=()=>key(S.supR,0);
+const mirrorCol=()=>(S.supL+S.supR)/2;
+const mirror=k=>{const[c,r]=parse(k);return key(Math.round(2*mirrorCol()-c),r);};
+
+/* material properties with per-material user overrides */
+function M(matKey){
+  const base=MATLIB[matKey]||MATLIB.popsicle;
+  return Object.assign({},base,S.ov[matKey]||{});
+}
+/* geometric + strength properties of one member */
+function memProps(m){
+  const mat=M(m.mat||'popsicle');
+  if(mat.kind==='string'){
+    return {mat,isString:true,A:Math.PI*mat.w*mat.w/4,I:0,E:mat.E,rho:mat.rho,
+            stickL:mat.stickL,capT:mat.breaking,capC:0,w:mat.w};
+  }
+  const lam=S.lam, w=mat.w, t=mat.t*lam;
+  const A=w*t;
+  const Iin=t*Math.pow(w,3)/12, Iout=w*Math.pow(t,3)/12;
+  const I=S.axis==='in'?Iin:Iout;
+  const conn=CONNLIB[m.conn||'glue'];
+  let cj=Infinity;
+  if(conn.mode==='shear') cj=w*S.overlap*S.tau;
+  else if(conn.mode==='fixed') cj=S.lashCap;
+  const Keff=S.useConnK?(conn.K!==undefined?conn.K:S.K):S.K;
+  return {mat,isString:false,A,I,E:mat.E,rho:mat.rho,stickL:mat.stickL,w,connCap:cj,
+          sigT:mat.sigT,sigC:mat.sigC,Keff,conn};
+}
+function memberCapacities(m,L){
+  const p=memProps(m);
+  if(p.isString) return {capT:p.capT,capC:0,whyT:'string breaks',whyC:'string cannot push',p};
+  const capT=Math.min(p.sigT*p.A,p.connCap);
+  const whyT=p.connCap<p.sigT*p.A?'joint pulls apart':'wood tears';
+  const Pcr=Math.PI*Math.PI*p.E*p.I/Math.pow(p.Keff*L,2);   // K comes from the connection type
+  const opts=[['crushing',p.sigC*p.A],['buckling',Pcr]];
+  if(S.jointMode==='both') opts.push(['joint crushing',p.connCap]);
+  opts.sort((a,b)=>a[1]-b[1]);
+  return {capT,capC:opts[0][1],whyT,whyC:opts[0][0],Pcr,p};
+}
+
+/* ============ VALIDATION ============ */
+function labelOf(k){
+  const arr=[...S.nodes].sort((a,b)=>{const[c1,r1]=parse(a),[c2,r2]=parse(b);return r1-r2||c1-c2;});
+  let n=arr.indexOf(k),s='';
+  do{s=String.fromCharCode(65+(n%26))+s;n=Math.floor(n/26)-1;}while(n>=0);
+  return s;
+}
+const mName=m=>labelOf(m.a)+labelOf(m.b);
+const sameEdge=(m,a,b)=>(m.a===a&&m.b===b)||(m.a===b&&m.b===a);
+const hasMem=(md,a,b)=>md.members.some(m=>sameEdge(m,a,b));
+const mlen=(a,b)=>{const p=xyOf(a),q=xyOf(b);return Math.hypot(q.x-p.x,q.y-p.y);};
+function degMap(md){const d={};md.nodes.forEach(n=>d[n]=0);md.members.forEach(m=>{d[m.a]++;d[m.b]++;});return d;}
+function segCross(p1,p2,p3,p4){
+  const o=(a,b,c)=>Math.sign((b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x));
+  const d1=o(p3,p4,p1),d2=o(p3,p4,p2),d3=o(p1,p2,p3),d4=o(p1,p2,p4);
+  return d1!==d2&&d3!==d4&&d1&&d2&&d3&&d4;
+}
+function onSeg(p,a,b){
+  const cr=(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);
+  if(Math.abs(cr)>1e-12)return false;
+  const dt=(p.x-a.x)*(b.x-a.x)+(p.y-a.y)*(b.y-a.y);
+  return dt>1e-12&&dt<(b.x-a.x)**2+(b.y-a.y)**2-1e-12;
+}
+function isSym(md){
+  for(const n of md.nodes) if(!md.nodes.has(mirror(n))) return false;
+  for(const m of md.members){
+    const p=md.members.find(x=>sameEdge(x,mirror(m.a),mirror(m.b)));
+    if(!p||p.mat!==m.mat||(p.conn||'glue')!==(m.conn||'glue')) return false;
+  }
+  return true;
+}
+function stickCount(md){
+  let n=0;
+  for(const m of md.members){
+    const p=memProps(m); if(p.isString) continue;
+    n+=Math.max(1,Math.ceil(mlen(m.a,m.b)/p.stickL-1e-9))*S.lam*S.planes;
+  }
+  return n;
+}
+function woodLen(md){
+  let L=0;
+  for(const m of md.members){const p=memProps(m); if(!p.isString) L+=mlen(m.a,m.b);}
+  return L*S.lam*S.planes;
+}
+
+function validate(md){
+  const N=md.nodes,MM=md.members;
+  // computed up front so the budget panel stays informative even when the design is invalid
+  const sticks0=stickCount(md), wood0=woodLen(md);
+  const bad=(msg)=>({ok:false,msg,sticks:sticks0,wood:wood0});
+  if(!N.has(SUPL())||!N.has(SUPR())) return bad('Both supports must sit on active joints.');
+  if(S.supL===S.supR) return bad('The two supports are at the same place.');
+  if(!MM.length) return bad('No members yet. If you have just enlarged the span, the grid spacing ('+
+    (pitch()*1000).toFixed(0)+' mm) may now exceed one '+(M(S.newMat).stickL*1000).toFixed(0)+
+    ' mm piece — increase the grid divisions so members stay cuttable, then rebuild the design.');
+  if(S.symmetric&&!isSym(md)) return bad('Design is not symmetric about mid-span. Turn symmetry off in Settings to allow this.');
+  for(const m of MM){
+    if(m.a===m.b) return bad('A member starts and ends at the same joint.');
+    if(!N.has(m.a)||!N.has(m.b)) return bad('A member is attached to a joint that no longer exists.');
+    const L=mlen(m.a,m.b), p=memProps(m);
+    if(L<1e-9) return bad('Zero-length member.');
+    if(!p.isString&&L>p.stickL+1e-9)
+      return bad(`Member ${mName(m)} is ${(L*1000).toFixed(0)} mm — longer than one ${(p.stickL*1000).toFixed(0)} mm ${p.mat.label} piece.`);
+  }
+  const seen=new Set();
+  for(const m of MM){const k=[m.a,m.b].sort().join('|');
+    if(seen.has(k))return{ok:false,msg:'Two members are doubled up between the same joints.'};seen.add(k);}
+  const deg=degMap(md);
+  for(const n of N) if(deg[n]<2) return bad(`Joint ${labelOf(n)} has only one member — it would flop.`);
+  for(let i=0;i<MM.length;i++){
+    const a1=xyOf(MM[i].a),b1=xyOf(MM[i].b);
+    for(const n of N){ if(n===MM[i].a||n===MM[i].b)continue;
+      if(onSeg(xyOf(n),a1,b1)) return bad(`A member runs through joint ${labelOf(n)} — split it in two.`); }
+    for(let j=i+1;j<MM.length;j++){
+      if(MM[i].a===MM[j].a||MM[i].a===MM[j].b||MM[i].b===MM[j].a||MM[i].b===MM[j].b)continue;
+      if(segCross(a1,b1,xyOf(MM[j].a),xyOf(MM[j].b))) return bad('Two members cross with no joint there — that cannot be built.');
+    }
+  }
+  const adj={};N.forEach(n=>adj[n]=[]);MM.forEach(m=>{adj[m.a].push(m.b);adj[m.b].push(m.a);});
+  const seenN=new Set([SUPL()]),st=[SUPL()];
+  while(st.length){const c=st.pop();for(const nb of adj[c])if(!seenN.has(nb)){seenN.add(nb);st.push(nb);}}
+  if(seenN.size!==N.size) return bad('Part of the truss is not connected to the supports.');
+
+  /* loading */
+  let maxR=-1;N.forEach(n=>maxR=Math.max(maxR,parse(n)[1]));
+  if(maxR<=0) return bad('The truss needs height for the load to act on.');
+  let contact;
+  if(S.loadType==='plate'){
+    const yTop=maxR*pitch();
+    contact=[...N].filter(n=>(yTop-parse(n)[1]*pitch())<=S.plateTol+1e-12&&n!==SUPL()&&n!==SUPR());
+    if(!contact.length) return bad('The loading plate has nothing to bear on except the supports.');
+  } else {
+    const tops=[...N].filter(n=>parse(n)[1]===maxR);
+    const ctr=Math.round(mirrorCol());
+    const hook=tops.find(n=>parse(n)[0]===ctr)||tops[0];
+    if(!hook||hook===SUPL()||hook===SUPR()) return bad('Need a joint at the top, away from the supports, for the hook.');
+    contact=[hook];
+  }
+  const sticks=sticks0, wood=wood0;
+  if(S.budget==='count'){
+    if(sticks>S.maxSticks) return {ok:false,msg:`Uses ${sticks} sticks — the budget is ${S.maxSticks}.`,sticks,wood};
+    if(S.minSticks>0&&sticks<S.minSticks) return {ok:false,msg:`Uses only ${sticks} sticks — the minimum is ${S.minSticks}.`,sticks,wood};
+  } else if(wood>S.pieces*S.stock+1e-9)
+    return {ok:false,msg:`Stock used ${(wood*1000).toFixed(0)} mm exceeds the ${(S.pieces*S.stock*1000).toFixed(0)} mm allowance.`,sticks,wood};
+
+  const j=N.size,m=MM.length;
+  if(m+3<2*j) return bad(`Not rigid: ${m} members + 3 reactions < 2 × ${j} joints. Add ${2*j-3-m} member(s) or triangulate.`);
+  if(m+3>2*j) return bad(`${m+3-2*j} redundant member(s): this method needs ${2*j-3} members for ${j} joints.`);
+  return {ok:true,contact,maxR,sticks,wood};
+}
+
+/* ============ SOLVERS ============ */
+function solveForces(md,contact){
+  const arr=[...md.nodes].sort((a,b)=>{const[c1,r1]=parse(a),[c2,r2]=parse(b);return r1-r2||c1-c2;});
+  const idx=new Map();arr.forEach((k,i)=>idx.set(k,i));
+  const j=arr.length,m=md.members.length,n=2*j;
+  const A=Array.from({length:n},()=>new Float64Array(m+3)),b=new Float64Array(n);
+  md.members.forEach((s,mi)=>{
+    const p=xyOf(s.a),q=xyOf(s.b),L=Math.hypot(q.x-p.x,q.y-p.y);
+    const ux=(q.x-p.x)/L,uy=(q.y-p.y)/L,ia=2*idx.get(s.a),ib=2*idx.get(s.b);
+    A[ia][mi]+=ux;A[ia+1][mi]+=uy;A[ib][mi]-=ux;A[ib+1][mi]-=uy;
+  });
+  const iL=2*idx.get(SUPL()),iR=2*idx.get(SUPR());
+  A[iL][m]+=1;A[iL+1][m+1]+=1;A[iR+1][m+2]+=1;
+  const share=1/contact.length;                       // UNIT total applied load
+  for(const k of contact) b[2*idx.get(k)+1]+=share;
+  const Mx=A.map((row,i)=>{const r=Array.from(row);r.push(b[i]);return r;});
+  for(let c=0;c<n;c++){
+    let piv=c;for(let r=c+1;r<n;r++)if(Math.abs(Mx[r][c])>Math.abs(Mx[piv][c]))piv=r;
+    if(Math.abs(Mx[piv][c])<1e-9)return null;
+    [Mx[c],Mx[piv]]=[Mx[piv],Mx[c]];
+    for(let r=0;r<n;r++){if(r===c)continue;const f=Mx[r][c]/Mx[c][c];if(!f)continue;
+      for(let cc=c;cc<=n;cc++)Mx[r][cc]-=f*Mx[c][cc];}
+  }
+  const x=new Float64Array(n);for(let i=0;i<n;i++)x[i]=Mx[i][n]/Mx[i][i];
+  return {f:Array.from(x.slice(0,m)),R:{lx:x[m],ly:x[m+1],ry:x[m+2]},idx,arr};
+}
+/* displacements under UNIT applied load (direct stiffness, penalty BCs) */
+function solveDisp(md,contact,idx){
+  const arr=[...idx.keys()];const n=2*idx.size;
+  const K=Array.from({length:n},()=>new Float64Array(n));
+  md.members.forEach(m=>{
+    const p=memProps(m),a=xyOf(m.a),b=xyOf(m.b),L=Math.hypot(b.x-a.x,b.y-a.y);
+    const c=(b.x-a.x)/L,s=(b.y-a.y)/L,k=p.E*p.A/L;
+    const ia=2*idx.get(m.a),ib=2*idx.get(m.b),kk=[[c*c,c*s],[c*s,s*s]];
+    for(let u=0;u<2;u++)for(let v=0;v<2;v++){
+      K[ia+u][ia+v]+=k*kk[u][v];K[ib+u][ib+v]+=k*kk[u][v];
+      K[ia+u][ib+v]-=k*kk[u][v];K[ib+u][ia+v]-=k*kk[u][v];}
+  });
+  let md_=0;for(let i=0;i<n;i++)md_=Math.max(md_,K[i][i]);
+  const PEN=md_*1e7;
+  const iL=2*idx.get(SUPL()),iR=2*idx.get(SUPR());
+  K[iL][iL]+=PEN;K[iL+1][iL+1]+=PEN;K[iR+1][iR+1]+=PEN;
+  const f=new Float64Array(n),share=1/contact.length;
+  for(const k of contact) f[2*idx.get(k)+1]-=share;      // downward
+  const Mx=K.map((row,i)=>{const r=Array.from(row);r.push(f[i]);return r;});
+  for(let c=0;c<n;c++){
+    let piv=c;for(let r=c+1;r<n;r++)if(Math.abs(Mx[r][c])>Math.abs(Mx[piv][c]))piv=r;
+    if(Math.abs(Mx[piv][c])<1e-12)return null;
+    [Mx[c],Mx[piv]]=[Mx[piv],Mx[c]];
+    for(let r=0;r<n;r++){if(r===c)continue;const fa=Mx[r][c]/Mx[c][c];if(!fa)continue;
+      for(let cc=c;cc<=n;cc++)Mx[r][cc]-=fa*Mx[c][cc];}
+  }
+  const d=new Float64Array(n);for(let i=0;i<n;i++)d[i]=Mx[i][n]/Mx[i][i];
+  return d;
+}
+
+/* ============ ANALYSIS: unit-load response + failure load ============ */
+function analyze(md){
+  md=md||{nodes:S.nodes,members:S.members};
+  const v=validate(md);
+  if(!v.ok) return {ok:false,msg:v.msg,sticks:v.sticks||0,wood:v.wood||0};
+  const sol=solveForces(md,v.contact);
+  if(!sol) return {ok:false,msg:'Geometrically unstable — the members line up so they cannot resist the load.',sticks:v.sticks,wood:v.wood};
+  const disp=solveDisp(md,v.contact,sol.idx);
+
+  let weight=0,failLoad=Infinity,failIdx=-1,failWhy='',nZero=0,maxCompL=0;
+  const per=md.members.map((m,i)=>{
+    const L=mlen(m.a,m.b),p=memProps(m);
+    const f=sol.f[i]/S.planes;                    // per plane: n planes share the load
+    const cs=memberCapacities(m,L);
+    weight+=p.rho*p.A*L*(p.isString?1:S.planes);
+    const zero=Math.abs(f)<1e-9; if(zero)nZero++;
+    if(f<0&&!p.isString) maxCompL=Math.max(maxCompL,L);
+    const cap=f>=0?cs.capT:cs.capC;
+    const why=f>=0?cs.whyT:cs.whyC;
+    const pf=zero?Infinity:(cap<=0?0:cap/Math.abs(f));   // applied load at which THIS member fails
+    if(pf<failLoad){failLoad=pf;failIdx=i;failWhy=why;}
+    return {i,m,L,fUnit:f,cap,why,pFail:pf,zero,isString:p.isString,A:p.A,Pcr:cs.Pcr,connCap:p.connCap};
+  });
+  // deflection at the load point per unit applied load
+  let dUnit=0;
+  for(const k of v.contact){const i=sol.idx.get(k);dUnit=Math.max(dUnit,Math.abs(disp[2*i+1]));}
+  return {ok:true,per,sol,disp,contact:v.contact,md,
+    sticks:v.sticks,wood:v.wood,weightG:weight*1000,
+    capacity:failLoad,critical:failIdx>=0?mName(md.members[failIdx].a?md.members[failIdx]:md.members[failIdx]):'—',
+    critIdx:failIdx,mode:failWhy,nZero,maxCompL,dUnit,
+    sw:failLoad/(weight*1000),joints:md.nodes.size,nMembers:md.members.length,
+    nString:md.members.filter(m=>memProps(m).isString).length};
+}
+
+/* ============ DESIGN LIBRARY — geometry appears immediately ============ */
+function clearModel(){S.nodes=new Set();S.members=[];}
+function addN(c,r){S.nodes.add(key(c,r));}
+function addM(a,b,mat,conn){
+  if(hasMem({nodes:S.nodes,members:S.members},a,b))return;
+  S.members.push({a,b,mat:mat||S.newMat,conn:conn||S.newConn});
+}
+function memberCapFor(){return Math.max(3,Math.floor(S.maxSticks/(S.lam*S.planes)));}
+
+function buildBridge(){                       // Pratt: level top chord, load near mid-span
+  clearModel();
+  const C=S.cols,cap=memberCapFor(),maxL=M(S.newMat).stickL;
+  let best=null;
+  for(let st=1;st<=Math.floor(C/2);st++){
+    const bot=[];for(let c=0;c<=C;c+=st)bot.push(c);
+    if(bot[bot.length-1]!==C)continue;
+    const top=bot.slice(1,-1);
+    if(top.length<1)continue;
+    for(let TR=Math.min(S.rows,6);TR>=1;TR--){
+      if(Math.hypot(st*pitch(),TR*pitch())>maxL)continue;
+      if(st*pitch()>maxL||TR*pitch()>maxL)continue;
+      const m=(bot.length-1)+(top.length-1)+top.length+2+Math.max(0,top.length-1);
+      if(m<=cap&&(!best||m>best.m)){best={st,TR,bot,top,m};}
+      break;
+    }
+  }
+  if(!best){
+    // No layout fits the stick budget. Build the coarsest one that still respects the
+    // stick LENGTH so every member is physically cuttable; the budget check then
+    // reports the real problem ("uses N sticks, budget is M") instead of an
+    // impossible over-length member.
+    for(let st=Math.floor(C/2);st>=1&&!best;st--){
+      const bot=[];for(let c=0;c<=C;c+=st)bot.push(c);
+      if(bot[bot.length-1]!==C)continue;
+      const top=bot.slice(1,-1);if(top.length<1)continue;
+      for(let TR=Math.min(S.rows,6);TR>=1;TR--){
+        if(Math.hypot(st*pitch(),TR*pitch())>maxL)continue;
+        if(st*pitch()>maxL||TR*pitch()>maxL)continue;
+        best={st,TR,bot,top};break;
+      }
+    }
+  }
+  if(!best){                                    // grid itself is too coarse for the stock
+    addN(0,0);addN(C,0);S.supL=0;S.supR=C;return;
+  }
+  const {TR,bot,top}=best;
+  bot.forEach(c=>addN(c,0)); top.forEach(c=>addN(c,TR));
+  for(let i=0;i<bot.length-1;i++) addM(key(bot[i],0),key(bot[i+1],0));
+  for(let i=0;i<top.length-1;i++) addM(key(top[i],TR),key(top[i+1],TR));
+  top.forEach(c=>addM(key(c,0),key(c,TR)));
+  addM(key(0,0),key(top[0],TR)); addM(key(C,0),key(top[top.length-1],TR));
+  const mid=(top.length-1)/2;
+  for(let i=0;i<top.length-1;i++)
+    addM(i<mid?key(top[i],TR):key(top[i+1],TR), i<mid?key(top[i+1],0):key(top[i],0));
+  S.supL=0;S.supR=C;
+}
+function buildRoof(){                          // pitched king-post with level ceiling tie
+  clearModel();
+  const C=S.cols,ctr=Math.round(C/2),maxL=M(S.newMat).stickL;
+  let ridge=Math.min(S.rows,Math.max(2,Math.round(S.rows*0.7)));
+  const q=Math.max(1,Math.round(ctr/2));
+  let mid=Math.max(1,Math.round(ridge/2));
+  while(ridge>1&&Math.hypot(q*pitch(),mid*pitch())>maxL){ridge--;mid=Math.max(1,Math.round(ridge/2));}
+  [[0,0],[q,0],[ctr,0],[C-q,0],[C,0],[ctr,ridge],[q,mid],[C-q,mid]].forEach(p=>addN(p[0],p[1]));
+  const W=(a,b)=>addM(a,b);
+  W(key(0,0),key(q,0));W(key(q,0),key(ctr,0));W(key(ctr,0),key(C-q,0));W(key(C-q,0),key(C,0));
+  W(key(0,0),key(q,mid));W(key(q,mid),key(ctr,ridge));
+  W(key(C,0),key(C-q,mid));W(key(C-q,mid),key(ctr,ridge));
+  W(key(ctr,0),key(ctr,ridge));
+  W(key(q,0),key(q,mid));W(key(C-q,0),key(C-q,mid));
+  W(key(q,mid),key(ctr,0));W(key(C-q,mid),key(ctr,0));
+  S.supL=0;S.supR=C;
+}
+function buildGeneral(){                       // Warren: alternating diagonals, no verticals
+  clearModel();
+  const C=S.cols,cap=memberCapFor(),maxL=M(S.newMat).stickL;
+  // panel width must be EVEN so the top nodes land on grid columns
+  let pick=null;
+  for(let st=2;st<=C;st+=2){
+    if(C%st!==0)continue;
+    const n=C/st;                                  // number of panels
+    if(n<2)continue;
+    const m=4*n-1;                                 // chords + 2 diagonals per panel
+    if(m>cap)continue;
+    for(let TR=Math.min(S.rows,6);TR>=1;TR--){
+      if(Math.hypot((st/2)*pitch(),TR*pitch())>maxL)continue;
+      if(st*pitch()>maxL)continue;
+      pick={st,n,TR,m};break;
+    }
+    if(pick)break;                                 // finest layout that fits wins
+  }
+  if(!pick){
+    // Budget cannot be met: fall back to the coarsest Warren whose members still fit a
+    // stock piece, so the reported error is the budget rather than an uncuttable member.
+    for(let st=C;st>=2&&!pick;st-=2){
+      if(C%st!==0)continue;
+      const n=C/st;if(n<1)continue;
+      for(let TR=Math.min(S.rows,6);TR>=1;TR--){
+        if(Math.hypot((st/2)*pitch(),TR*pitch())>maxL)continue;
+        if(st*pitch()>maxL)continue;
+        pick={st,n,TR};break;
+      }
+    }
+  }
+  if(!pick){ addN(0,0);addN(C,0);S.supL=0;S.supR=C;return; }
+  const {st,TR}=pick;
+  const bot=[];for(let c=0;c<=C;c+=st)bot.push(c);
+  const top=[];for(let c=st/2;c<C;c+=st)top.push(c);
+  bot.forEach(c=>addN(c,0));top.forEach(c=>addN(c,TR));
+  for(let i=0;i<bot.length-1;i++)addM(key(bot[i],0),key(bot[i+1],0));
+  for(let i=0;i<top.length-1;i++)addM(key(top[i],TR),key(top[i+1],TR));
+  top.forEach((c,i)=>{addM(key(bot[i],0),key(c,TR));addM(key(c,TR),key(bot[i+1],0));});
+  S.supL=0;S.supR=C;
+}
+/* Canonical geometry for a design type. Custom gets a simple symmetric
+   starting truss of its own so it never inherits another design's shape. */
+function buildDesign(kind){
+  if(kind==='bridge')      buildBridge();
+  else if(kind==='roof')   buildRoof();
+  else if(kind==='general')buildGeneral();
+  else                     buildCustomStart();
+  S.design=kind;
+}
+function buildCustomStart(){
+  clearModel();
+  const C=S.cols,ctr=C/2,maxL=M(S.newMat).stickL;
+  let TR=Math.min(S.rows,3);
+  while(TR>1&&Math.hypot(ctr*pitch(),TR*pitch())>maxL)TR--;
+  const q=Math.round(ctr/2);
+  [[0,0],[q,0],[ctr,0],[C-q,0],[C,0],[q,TR],[ctr,TR],[C-q,TR]].forEach(p=>addN(p[0],p[1]));
+  for(const a of [[0,q],[q,ctr],[ctr,C-q],[C-q,C]]) addM(key(a[0],0),key(a[1],0));
+  addM(key(q,TR),key(ctr,TR));addM(key(ctr,TR),key(C-q,TR));
+  [q,ctr,C-q].forEach(c=>addM(key(c,0),key(c,TR)));
+  addM(key(0,0),key(q,TR));addM(key(C,0),key(C-q,TR));
+  addM(key(q,TR),key(ctr,0));addM(key(C-q,TR),key(ctr,0));
+  S.supL=0;S.supR=C;
+}
+
+/* Remap the current geometry onto a new grid. Columns are mapped about the
+   mid-span so a symmetric truss STAYS symmetric: the left half is scaled and the
+   right half is written as its exact mirror, which removes the rounding drift
+   that used to appear on the right-hand side when the grid grew. */
+function rescaleGrid(oldC,oldR,newC,newR){
+  if(oldC===newC&&oldR===newR) return true;
+  const kc=newC/oldC, kr=newR/oldR;
+  const mapC=c=>(c*2<=oldC) ? Math.round(c*kc) : newC-Math.round((oldC-c)*kc);
+  const mapR=r=>Math.min(newR,Math.round(r*kr));
+  const mapK=k=>{const[c,r]=parse(k);return key(Math.max(0,Math.min(newC,mapC(c))),Math.max(0,mapR(r)));};
+  const seen=new Map();
+  for(const n of S.nodes){
+    const t=mapK(n);
+    if(seen.has(t)) return false;                 // collision — refuse rather than mangle
+    seen.set(t,n);
+  }
+  const nn=new Set([...S.nodes].map(mapK));
+  const nm=[];
+  for(const m of S.members){
+    const a=mapK(m.a),b=mapK(m.b);
+    if(a===b) continue;
+    if(nm.some(x=>sameEdge(x,a,b))) continue;
+    nm.push({...m,a,b});
+  }
+  S.nodes=nn;S.members=nm;
+  S.supL=Math.max(0,Math.min(newC,mapC(S.supL)));
+  S.supR=Math.max(0,Math.min(newC,mapC(S.supR)));
+  if(S.supL===S.supR){S.supL=0;S.supR=newC;}
+  S.nodes.add(SUPL());S.nodes.add(SUPR());
+  return true;
+}
+/* Force the right half to be an exact mirror of the left. Gives the user a way to
+   repair symmetry after free-form editing or a support move. */
+function makeSymmetric(){
+  const ax=mirrorCol();
+  const keep=[...S.nodes].filter(n=>{const[c]=parse(n);return c*1<=ax+1e-9;});
+  const nn=new Set(keep);
+  keep.forEach(n=>{const m=mirror(n);const[c,r]=parse(m);
+    if(c>=0&&c<=S.cols&&r>=0&&r<=S.rows) nn.add(m);});
+  const nm=[];
+  for(const m of S.members){
+    const[ca]=parse(m.a),[cb]=parse(m.b);
+    if(ca>ax+1e-9&&cb>ax+1e-9) continue;          // purely right-hand members are regenerated
+    if(!nn.has(m.a)||!nn.has(m.b)) continue;
+    if(!nm.some(x=>sameEdge(x,m.a,m.b))) nm.push({...m});
+  }
+  nm.slice().forEach(m=>{
+    const ma=mirror(m.a),mb=mirror(m.b);
+    if(ma===m.a&&mb===m.b) return;
+    if(!nn.has(ma)||!nn.has(mb)) return;
+    if(!nm.some(x=>sameEdge(x,ma,mb))) nm.push({...m,a:ma,b:mb});
+  });
+  if(nn.size<2||(S.nodes.size>3&&nn.size<3)) return;   // refuse to gut the design
+  S.nodes=nn;S.members=nm;
+  S.nodes.add(SUPL());S.nodes.add(SUPR());
+}
+
+/* ---- one independent workspace per design type ---- */
+const WS={};
+function stashWorkspace(){
+  if(!S.design)return;
+  // Never store a model that does not analyse — a mid-animation trial would otherwise
+  // be saved as this design's workspace and reappear (blank) when you come back.
+  if(!S.members.length||!analyze().ok){
+    if(WS[S.design])return;                          // keep the last good copy instead
+  }
+  WS[S.design]={nodes:new Set(S.nodes),members:S.members.map(m=>({...m},{}) ),supL:S.supL,supR:S.supR};
+  WS[S.design].members=S.members.map(m=>({...m}));
+}
+function switchDesign(kind){
+  if(OPT.running){                  // a run in flight would otherwise paint into the new design
+    if(OPT.timer)clearTimeout(OPT.timer);
+    OPT.token++;OPT.running=false;OPT.paused=false;
+    ensureValidModel([OPT.best,OPT.student]);
+  }
+  rampStop();
+  stashWorkspace();                 // remember the one we are leaving, edits and all
+  clearTestState();                 // every configuration starts its test from zero
+  clearOptState();
+  S.design=kind;
+  if(WS[kind]&&WS[kind].members&&WS[kind].members.length){
+    S.nodes=new Set(WS[kind].nodes);
+    S.members=WS[kind].members.map(m=>({...m}));
+    S.supL=WS[kind].supL;S.supR=WS[kind].supR;
+    if(!S.members.length){delete WS[kind];buildDesign(kind);}
+  } else {
+    buildDesign(kind);              // first visit -> canonical geometry
+  }
+}
+function resetCurrentDesign(){      // rebuild this design from scratch
+  clearTestState();clearOptState();
+  buildDesign(S.design);
+  delete WS[S.design];
+}
+
+/* ============ symmetric editing ============ */
+function addNodeSym(k){
+  S.nodes.add(k); if(S.symmetric){const mk=mirror(k);const[c,r]=parse(mk);
+    if(c>=0&&c<=S.cols&&r>=0&&r<=S.rows) S.nodes.add(mk);}
+}
+function delNodeSym(k){
+  if(k===SUPL()||k===SUPR()){
+    const h=$('plabHint');
+    if(h)h.textContent='That joint carries a support, so it cannot be deleted — drag it instead, or use the Support tool to put the support somewhere else.';
+    return;
+  }
+  const ks=S.symmetric?[k,mirror(k)]:[k];
+  for(const x of ks){ if(x===SUPL()||x===SUPR())continue;
+    S.nodes.delete(x); S.members=S.members.filter(m=>m.a!==x&&m.b!==x); }
+}
+function addMemberSym(a,b,mat,conn){
+  addM(a,b,mat,conn);
+  if(S.symmetric){const ma=mirror(a),mb=mirror(b);
+    if(!(ma===a&&mb===b)&&S.nodes.has(ma)&&S.nodes.has(mb)) addM(ma,mb,mat,conn);}
+}
+function delMemberSym(a,b){
+  S.members=S.members.filter(m=>!sameEdge(m,a,b));
+  if(S.symmetric){const ma=mirror(a),mb=mirror(b);S.members=S.members.filter(m=>!sameEdge(m,ma,mb));}
+}
+/* Move a joint (and its mirror) to a new lattice position, carrying its members. */
+function moveNodeSym(from,to){
+  if(from===to)return false;
+  const pair=(S.symmetric&&mirror(from)!==from)?[from,mirror(from)]:[from];
+  const tgt=pair.map((k,i)=>i===0?to:mirror(to));
+  for(let i=0;i<tgt.length;i++){
+    const[c,r]=parse(tgt[i]);
+    if(c<0||c>S.cols||r<0||r>S.rows)return false;
+    if(S.nodes.has(tgt[i])&&!pair.includes(tgt[i]))return false;   // occupied
+  }
+  if(new Set(tgt).size!==tgt.length)return false;
+  const isSup=pair.map(k=>k===SUPL()?'L':(k===SUPR()?'R':null));
+  pair.forEach(k=>S.nodes.delete(k));
+  tgt.forEach(k=>S.nodes.add(k));
+  S.members=S.members.map(m=>{let a=m.a,b=m.b;
+    pair.forEach((k,i)=>{if(a===k)a=tgt[i];if(b===k)b=tgt[i];});return{...m,a,b};});
+  // a dragged support keeps being a support at its new column
+  isSup.forEach((role,i)=>{const[c,r]=parse(tgt[i]);
+    if(role==='L'&&r===0)S.supL=c; if(role==='R'&&r===0)S.supR=c;});
+  if(S.supL===S.supR){S.supL=0;S.supR=S.cols;S.nodes.add(SUPL());S.nodes.add(SUPR());}
+  return true;
+}
+function assignSym(a,b,mat,conn){
+  S.members.forEach(m=>{if(sameEdge(m,a,b)){m.mat=mat;m.conn=conn;}});
+  if(S.symmetric){const ma=mirror(a),mb=mirror(b);
+    S.members.forEach(m=>{if(sameEdge(m,ma,mb)){m.mat=mat;m.conn=conn;}});}
+}
+
+/* ============ LOAD RAMP (the Instron ramping up) ============ */
+const RAMP={running:false,frac:0,timer:null,failed:false,speed:1};
+function rampStop(){RAMP.running=false;if(RAMP.timer)clearInterval(RAMP.timer);RAMP.timer=null;}
+/* the ONE place that clears a test; nothing else touches RAMP fields directly */
+function clearTestState(){rampStop();RAMP.frac=0;RAMP.failed=false;}
+function rampReset(){clearTestState();draw();}
+function rampStart(){
+  const r=analyze();
+  if(!r.ok){alert('Fix the design before running the test:\n\n'+r.msg);return;}
+  rampStop();
+  if(RAMP.failed){RAMP.frac=0;RAMP.failed=false;}   // finished test -> start a fresh one
+  RAMP.running=true;
+  RAMP.timer=setInterval(()=>{
+    RAMP.frac+=0.012*RAMP.speed;
+    if(RAMP.frac>=1){RAMP.frac=1;RAMP.failed=true;rampStop();}
+    draw();
+  },40);
+}
+/* current applied load in newtons */
+function currentLoad(res){
+  if(S.loadType==='hook') return S.hookLoad;
+  return res&&res.ok ? RAMP.frac*res.capacity : 0;
+}
+
+/* ============ DRAWING ============ */
+const cv=$('plabCanvas'),cx=cv.getContext('2d');
+let DPR=1,VT={s:1,ox:0,oy:0},hoverKey=null,pending=null,tool='joint',showDefl=true,colourBy='force';
+const cssv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+function fit(){
+  DPR=window.devicePixelRatio||1;
+  const r=cv.parentElement.getBoundingClientRect();
+  cv.width=r.width*DPR;cv.height=r.height*DPR;
+  cv.style.width=r.width+'px';cv.style.height=r.height+'px';
+  const W=S.cols*pitch(),H=S.rows*pitch();
+  VT.s=Math.min((r.width-210)/W,(r.height-240)/H);
+  VT.ox=(r.width-W*VT.s)/2;VT.oy=(r.height+H*VT.s)/2-30;
+  draw();
+}
+const S2=k=>{const p=xyOf(k);return{x:p.x*VT.s+VT.ox,y:VT.oy-p.y*VT.s};};
+function S2d(k,res,scale){
+  const p=xyOf(k);let dx=0,dy=0;
+  if(res&&res.ok&&showDefl&&res.disp){
+    const i=res.sol.idx.get(k);
+    if(i!==undefined){dx=res.disp[2*i]*scale;dy=res.disp[2*i+1]*scale;}
+  }
+  return {x:(p.x+dx)*VT.s+VT.ox, y:VT.oy-(p.y+dy)*VT.s};
+}
+function utilColour(u){
+  if(u>=1)   return '#B3261E';
+  if(u>=0.8) return '#D2691E';
+  if(u>=0.5) return '#B7791F';
+  return '#1F8A4C';
+}
+function draw(){
+  const W=cv.width/DPR,H=cv.height/DPR;
+  cx.setTransform(DPR,0,0,DPR,0,0);
+  cx.fillStyle=cssv('--paper');cx.fillRect(0,0,W,H);
+  const res=analyze();
+  const P=currentLoad(res);
+  // deflection scale: exaggerate so the shape is visible
+  let dscale=0;
+  if(res.ok&&res.dUnit>0){ const targ=0.03*S.span; dscale=Math.min(targ/(res.dUnit*Math.max(P,1e-9))||0,1e9)*P; }
+  if(!isFinite(dscale))dscale=0;
+
+  // lattice
+  for(let c=0;c<=S.cols;c++)for(let r=0;r<=S.rows;r++){
+    const k=key(c,r);if(S.nodes.has(k))continue;
+    const s=S2(k);
+    cx.beginPath();cx.arc(s.x,s.y,hoverKey===k&&(tool==='joint'||tool==='support')?5:2.4,0,7);
+    cx.fillStyle=hoverKey===k&&(tool==='joint'||tool==='support')?'#9AA6B4':'#CCD4DD';cx.fill();
+  }
+  // undeformed ghost
+  if(res.ok&&showDefl&&dscale>0){
+    cx.strokeStyle='rgba(23,38,59,.13)';cx.lineWidth=2;
+    S.members.forEach(m=>{const a=S2(m.a),b=S2(m.b);
+      cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();});
+  }
+  // members
+  S.members.forEach((m,i)=>{
+    const a=S2d(m.a,res,dscale),b=S2d(m.b,res,dscale);
+    let col='#4A5A6E',w=5,dash=false;
+    const p=memProps(m); if(p.isString){dash=true;w=2.5;}
+    if(res.ok){
+      const pm=res.per[i],F=pm.fUnit*P,u=pm.cap>0?Math.abs(F)/pm.cap:(Math.abs(F)>0?2:0);
+      col = colourBy==='util' ? utilColour(u)
+           : (pm.zero?cssv('--zero'):(pm.fUnit>0?cssv('--tension'):cssv('--compression')));
+      w=(p.isString?2:3.5)+(p.isString?2:4.5)*Math.min(1,u);
+      if(u>=0.999){ // failing member
+        cx.strokeStyle='rgba(179,38,30,.30)';cx.lineWidth=w+12;cx.lineCap='round';
+        cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();
+      } else if(u>=0.795){
+        cx.strokeStyle='rgba(210,105,30,.22)';cx.lineWidth=w+9;cx.lineCap='round';
+        cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();
+      }
+    }
+    cx.strokeStyle=col;cx.lineWidth=w;cx.lineCap='round';
+    if(dash)cx.setLineDash([6,4]);
+    cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();cx.setLineDash([]);
+    if(res.ok&&P>0){
+      const pm=res.per[i],F=pm.fUnit*P,mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+      const txt=Math.abs(F)<0.5?'0':F.toFixed(0);
+      cx.font='600 10px '+cssv('--mono');const tw=cx.measureText(txt).width;
+      cx.fillStyle='rgba(247,248,245,.9)';cx.fillRect(mx-tw/2-3,my-8,tw+6,15);
+      cx.fillStyle=col;cx.textAlign='center';cx.textBaseline='middle';cx.fillText(txt,mx,my);
+    }
+  });
+  // rubber band
+  if((tool==='member')&&pending){
+    const a=S2(pending),b=hoverKey?S2(hoverKey):null;
+    if(b){cx.strokeStyle='rgba(23,38,59,.4)';cx.lineWidth=3;cx.setLineDash([6,5]);
+      cx.beginPath();cx.moveTo(a.x,a.y);cx.lineTo(b.x,b.y);cx.stroke();cx.setLineDash([]);}
+  }
+  // supports
+  [[SUPL(),'pin'],[SUPR(),'roller']].forEach(([k,ty])=>{
+    if(!S.nodes.has(k))return;
+    const s=S2(k);
+    cx.fillStyle='#DCE2EA';cx.strokeStyle=cssv('--ink');cx.lineWidth=2;
+    cx.beginPath();cx.moveTo(s.x,s.y+5);cx.lineTo(s.x-13,s.y+24);cx.lineTo(s.x+13,s.y+24);cx.closePath();cx.fill();cx.stroke();
+    if(ty==='roller')[-7,7].forEach(d=>{cx.beginPath();cx.arc(s.x+d,s.y+29,4,0,7);cx.fill();cx.stroke();});
+    const yb=ty==='roller'?s.y+33.5:s.y+24;
+    cx.lineWidth=1.6;cx.beginPath();cx.moveTo(s.x-18,yb);cx.lineTo(s.x+18,yb);cx.stroke();
+    cx.lineWidth=1.1;for(let i=-18;i<12;i+=6){cx.beginPath();cx.moveTo(s.x+i+6,yb);cx.lineTo(s.x+i,yb+7);cx.stroke();}
+    cx.fillStyle='#8894A3';cx.font='9.5px '+cssv('--body');cx.textAlign='center';
+    cx.fillText(ty==='pin'?'pin':'roller',s.x,yb+18);
+  });
+  // loading device + load path arrows
+  if(res.ok){
+    const ys=res.contact.map(k=>S2d(k,res,dscale).y),yTop=Math.min(...ys);
+    if(S.loadType==='plate'){
+      const x0=S2(key(0,0)).x-32,x1=S2(key(S.cols,0)).x+32;
+      const plateY=yTop-22;
+      cx.fillStyle=RAMP.failed?'#F0D2CE':'#CFD8E3';cx.strokeStyle=cssv('--ink');cx.lineWidth=2.4;
+      cx.beginPath();cx.rect(x0,plateY-15,x1-x0,15);cx.fill();cx.stroke();
+      cx.fillStyle=cssv('--ink');cx.font='600 10.5px '+cssv('--body');cx.textAlign='center';
+      cx.fillText('Instron compression plate',(x0+x1)/2,plateY-20);
+      cx.strokeStyle=cssv('--ink');cx.fillStyle=cssv('--ink');cx.lineWidth=2.2;
+      res.contact.forEach(k=>{const s=S2d(k,res,dscale);
+        cx.beginPath();cx.moveTo(s.x,plateY);cx.lineTo(s.x,s.y-9);cx.stroke();
+        cx.beginPath();cx.moveTo(s.x,s.y-8);cx.lineTo(s.x-4,s.y-15);cx.lineTo(s.x+4,s.y-15);cx.closePath();cx.fill();
+        const share=P/res.contact.length;
+        cx.font='600 9.5px '+cssv('--mono');cx.fillText(share.toFixed(0)+' N',s.x+16,(plateY+s.y)/2);
+      });
+    } else {
+      const k=res.contact[0],s=S2d(k,res,dscale),base=S2(key(0,0)).y+34;
+      cx.strokeStyle=cssv('--ink');cx.lineWidth=2;cx.setLineDash([3,3]);
+      cx.beginPath();cx.moveTo(s.x,s.y);cx.lineTo(s.x,base+30);cx.stroke();cx.setLineDash([]);
+      cx.beginPath();cx.arc(s.x,s.y,5.5,0,7);cx.lineWidth=2.4;cx.stroke();
+      cx.fillStyle='#DCE2EA';cx.lineWidth=2;
+      cx.beginPath();cx.moveTo(s.x-16,base+30);cx.lineTo(s.x+16,base+30);
+      cx.lineTo(s.x+12,base+56);cx.lineTo(s.x-12,base+56);cx.closePath();cx.fill();cx.stroke();
+      cx.fillStyle=cssv('--ink');cx.font='600 11px '+cssv('--mono');cx.textAlign='center';
+      cx.fillText(P.toFixed(0)+' N',s.x,base+74);
+    }
+    // reactions
+    [[SUPL(),res.sol.R.ly],[SUPR(),res.sol.R.ry]].forEach(([k,Rv])=>{
+      const s=S2(k),val=Rv*P;
+      cx.fillStyle=cssv('--reaction');cx.font='600 10px '+cssv('--mono');cx.textAlign='center';
+      cx.fillText(Math.abs(val).toFixed(0)+' N',s.x,s.y+58);
+    });
+  }
+  // joints
+  S.nodes.forEach(k=>{
+    const s=S2d(k,res,dscale),isSup=(k===SUPL()||k===SUPR());
+    cx.beginPath();cx.arc(s.x,s.y,7,0,7);cx.fillStyle='#fff';cx.fill();
+    cx.lineWidth=(hoverKey===k||pending===k)?3.3:2.3;
+    cx.strokeStyle=(hoverKey===k||pending===k)?cssv('--select'):cssv('--ink');cx.stroke();
+    cx.beginPath();cx.arc(s.x,s.y,2.2,0,7);cx.fillStyle=isSup?cssv('--reaction'):cssv('--ink');cx.fill();
+    cx.font='700 10.5px '+cssv('--display');cx.fillStyle=cssv('--ink');
+    cx.textAlign='center';cx.textBaseline='bottom';cx.fillText(labelOf(k),s.x+12,s.y-6);
+  });
+  cx.font='11px '+cssv('--mono');cx.fillStyle='#8894A3';cx.textAlign='left';cx.textBaseline='alphabetic';
+  cx.fillText(`span ${(S.span*1000).toFixed(0)} mm (${(S.span*1000/IN).toFixed(1)} in) · grid ${(pitch()*1000).toFixed(1)} mm`+
+    (showDefl&&dscale>0?` · deflection exaggerated`:''),14,H-14);
+  updatePanels(res,P);
+  drawGraph(res,P);
+  updateRampUI();
+}
+/* Single source of truth for the test controls. Called on every draw, so the
+   buttons can never be left showing a state the model is not actually in —
+   including when the ramp finishes by itself inside the timer. */
+function updateRampUI(){
+  const b=$('rampRun');if(!b)return;
+  b.textContent = RAMP.running ? 'Pause test'
+                : RAMP.failed  ? 'Run test again'
+                : RAMP.frac>0  ? 'Resume test'
+                :                'Run load test';
+  const sl=$('rampSlider');
+  if(sl&&document.activeElement!==sl) sl.value=Math.round(RAMP.frac*100);
+  const rs=$('rampReset');if(rs) rs.disabled=(RAMP.frac===0&&!RAMP.running);
+}
+
+/* ============ LOAD–DEFLECTION GRAPH ============ */
+function drawGraph(res,P){
+  const g=$('plabGraph');if(!g)return;
+  const c=g.getContext('2d'),dpr=window.devicePixelRatio||1;
+  const rect=g.getBoundingClientRect();
+  g.width=rect.width*dpr;g.height=rect.height*dpr;
+  c.setTransform(dpr,0,0,dpr,0,0);
+  const W=rect.width,H=rect.height,pad=32;
+  c.fillStyle='#fff';c.fillRect(0,0,W,H);
+  if(!res.ok){c.fillStyle='#8894A3';c.font='11px '+cssv('--body');c.textAlign='center';
+    c.fillText('Fix the design to see the test curve',W/2,H/2);return;}
+  const Pmax=Math.max(res.capacity,S.target)*1.05;
+  const dMax=res.dUnit*res.capacity*1000*1.05||1;
+  const X=d=>pad+(W-pad-10)*(d/dMax), Y=p=>H-pad-(H-pad-14)*(p/Pmax);
+  // axes
+  c.strokeStyle='#D3D9E1';c.lineWidth=1;
+  c.beginPath();c.moveTo(pad,10);c.lineTo(pad,H-pad);c.lineTo(W-8,H-pad);c.stroke();
+  c.fillStyle='#8894A3';c.font='9.5px '+cssv('--body');
+  c.textAlign='right';c.fillText('Load N',pad-4,16);
+  c.textAlign='center';c.fillText('deflection mm',(W+pad)/2,H-8);
+  // target line
+  if(S.target<Pmax){
+    c.strokeStyle='rgba(31,138,76,.55)';c.setLineDash([5,4]);
+    c.beginPath();c.moveTo(pad,Y(S.target));c.lineTo(W-8,Y(S.target));c.stroke();c.setLineDash([]);
+    c.fillStyle='#1F8A4C';c.textAlign='left';c.font='9px '+cssv('--mono');
+    c.fillText('target '+(S.target/LBF).toFixed(0)+' lbf',pad+4,Y(S.target)-3);
+  }
+  // linear-elastic curve to failure
+  c.strokeStyle=cssv('--ink');c.lineWidth=2.2;
+  c.beginPath();c.moveTo(X(0),Y(0));c.lineTo(X(res.dUnit*res.capacity*1000),Y(res.capacity));c.stroke();
+  // failure marker
+  const fx=X(res.dUnit*res.capacity*1000),fy=Y(res.capacity);
+  c.fillStyle='#B3261E';c.beginPath();c.arc(fx,fy,4.5,0,7);c.fill();
+  c.font='9.5px '+cssv('--mono');c.textAlign='right';
+  c.fillText('fails '+res.capacity.toFixed(0)+' N',fx-6,fy-6);
+  // current point
+  if(P>0){
+    const px=X(res.dUnit*P*1000),py=Y(P);
+    c.strokeStyle='rgba(23,38,59,.3)';c.setLineDash([3,3]);c.lineWidth=1;
+    c.beginPath();c.moveTo(pad,py);c.lineTo(px,py);c.lineTo(px,H-pad);c.stroke();c.setLineDash([]);
+    c.fillStyle=cssv('--select');c.beginPath();c.arc(px,py,5,0,7);c.fill();
+    c.strokeStyle='#fff';c.lineWidth=1.6;c.stroke();
+  }
+}
+
+/* ============ PANELS ============ */
+function buildAdvice(res){
+  const W=[];if(!res.ok)return W;
+  const deg=degMap({nodes:S.nodes,members:S.members});
+  const crowd=[...S.nodes].filter(n=>deg[n]>S.maxDeg);
+  if(crowd.length)W.push(`${crowd.length} joint(s) have more than ${S.maxDeg} members meeting — hard to glue cleanly.`);
+  const shorts=res.per.filter(p=>!p.isString&&p.L<S.minLen);
+  if(shorts.length)W.push(`${shorts.length} member(s) shorter than ${(S.minLen*1000).toFixed(0)} mm — fiddly to cut and glue.`);
+  if(res.nZero)W.push(`${res.nZero} member(s) carry no force — they cost sticks and weight.`);
+  if(S.axis==='out')W.push('Buckling is checked about the weak out-of-plane axis. Correct for one unbraced frame; switch to in-plane if you cross-brace two planes.');
+  if(S.jointMode==='both')W.push('The joint limit is being applied to squeezed members too. That is conservative — compression normally bears end-on.');
+  const pulled=res.per.filter(p=>!p.isString&&p.fUnit>0&&!p.zero).length;
+  if(pulled&&S.strAllow>0)W.push(`${pulled} member(s) are pulled — string ties could carry those and save sticks.`);
+  return W;
+}
+function updatePanels(res,P){
+  const led=$('plabLedger');
+  const cells=res.ok
+    ?[[res.capacity.toFixed(0)+' N','Failure load'],[(res.capacity/LBF).toFixed(0)+' lbf','= pounds'],
+      [P.toFixed(0)+' N','Applied now'],[res.sticks+'/'+S.maxSticks,'Sticks'],
+      [res.weightG.toFixed(1)+' g','Weight'],[(100*res.capacity/S.target).toFixed(0)+'%','of target']]
+    :[['—','Failure load'],['—','= pounds'],['—','Applied now'],['—','Sticks'],['—','Weight'],['—','of target']];
+  led.innerHTML=cells.map(c=>`<div class="cell"><b>${c[0]}</b><label>${c[1]}</label></div>`).join('')+
+    `<div class="stamp"><div class="badge ${res.ok?'ok':'bad'}">${res.ok?'Analysable ✓':'Not buildable'}</div></div>`;
+
+  const R=$('plabResult');
+  if(!res.ok){R.innerHTML=`<div class="msg-bad">${res.msg}</div>`;}
+  else{
+    const hit=res.capacity>=S.target;
+    const near=res.per.map((p,i)=>({p,u:p.cap>0?Math.abs(p.fUnit*P)/p.cap:0}))
+      .filter(x=>x.u>=0.795).sort((a,b)=>b.u-a.u);
+    R.innerHTML=`
+      <div class="row"><label>Applied load</label><span class="val"><b>${P.toFixed(0)} N</b> (${(P/LBF).toFixed(0)} lbf)</span></div>
+      <div class="progress" style="margin:6px 0"><i style="width:${Math.min(100,100*P/Math.max(res.capacity,1)).toFixed(1)}%;background:${RAMP.failed?'var(--bad)':'var(--ink)'}"></i></div>
+      <div class="row"><label>Predicted failure</label><span class="val"><b>${res.capacity.toFixed(0)} N</b> (${(res.capacity/LBF).toFixed(0)} lbf)</span></div>
+      <div class="row"><label>Target</label><span class="val" style="color:${hit?'var(--ok)':'var(--bad)'}">${S.target.toFixed(0)} N (${(S.target/LBF).toFixed(0)} lbf) — ${hit?'met':'not met'}</span></div>
+      <div class="row"><label>First to fail</label><span class="val">${res.per[res.critIdx]?mName(S.members[res.critIdx]):'—'} — ${res.mode}</span></div>
+      <div class="note" style="margin:4px 0 6px">${governNote(res)}</div>
+      <div class="row"><label>Deflection now</label><span class="val">${(res.dUnit*P*1000).toFixed(2)} mm</span></div>
+      <div class="row"><label>Strength / weight</label><span class="val">${res.sw.toFixed(1)} N/g</span></div>
+      ${RAMP.failed?`<div class="msg-bad" style="margin-top:8px">FAILURE — ${mName(S.members[res.critIdx])} gave way by ${res.mode} at ${res.capacity.toFixed(0)} N (${(res.capacity/LBF).toFixed(0)} lbf). In a statically determinate truss there is no spare load path, so the first member to go brings the whole structure down.</div>`
+        :(near.length?`<div class="note" style="margin-top:8px;color:var(--warn)"><b>Approaching capacity:</b><br>${near.slice(0,4).map(x=>`${mName(S.members[x.p.i])} at ${(100*x.u).toFixed(0)}% (${x.p.fUnit>0?'pulled':'squeezed'}, limit is ${x.p.why})`).join('<br>')}</div>`:'')}`;
+  }
+  const MA=$('plabAssume');
+  if(MA&&res.ok){
+    // use a stick member for the illustration; a string tie has no glued-lap capacity
+    const ref=S.members.find(m=>!memProps(m).isString)||{mat:'popsicle',conn:S.newConn};
+    const mp=memProps(ref);
+    const jcTxt=(mp.connCap===undefined||mp.connCap===Infinity)?'no limit':mp.connCap.toFixed(0)+' N';
+    MA.innerHTML=`
+      <details><summary style="cursor:pointer;font-weight:600;font-size:12px">Why don't member forces change when I change material?</summary>
+      <div class="note" style="margin-top:6px">In a statically <b>determinate</b> truss the axial forces follow from equilibrium alone —
+      geometry and applied load fix them completely. Stiffness never enters the equations, so swapping popsicle for balsa
+      leaves every member force identical at a given applied load.<br><br>
+      What material <b>does</b> change: deflection (∝ 1/E), strain, buckling capacity (∝ E·I), member capacity, utilisation,
+      the predicted failure load, and often <i>which</i> member fails first. That is why the Instron result moves even
+      though the force diagram does not. In an indeterminate truss stiffness would also redistribute the forces themselves.</div></details>
+      <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600;font-size:12px">How does connection type affect the model?</summary>
+      <div class="note" style="margin-top:6px">Connection type does two things here.
+      <b>(1) Tension capacity:</b> a glued lap carries width × overlap × shear strength
+      (${jcTxt} at present); a string lashing carries a fixed ${S.lashCap} N;
+      an ideal pin imposes no limit. This only bites when the joint is weaker than the wood.
+      <b>(2) Buckling restraint:</b> the effective-length factor K follows the connection —
+      glued lap ${CONNLIB.glue.K}, lashing ${CONNLIB.lash.K}, ideal pin ${CONNLIB.pin.K} — and buckling capacity goes as 1/K².
+      <br><br>So if a squeezed member is <i>crushing</i> rather than buckling, changing between glued and pinned will
+      correctly give the same failure load. That is physics, not a bug — the panel above always names what is governing.</div></details>
+      <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600;font-size:12px">What is idealised away?</summary>
+      <div class="note" style="margin-top:6px">Perfect pin joints with no slip, perfectly straight defect-free members, no out-of-plane
+      sway beyond the chosen buckling axis, no glue creep, a single vertical plane, and load shared equally between planes.
+      Real trusses fail below this prediction. Measuring by how much, and working out which assumption was optimistic,
+      is the point of the physical test.</div></details>`;
+  }
+  const BB=$('plabBuildable');
+  if(BB){
+    if(!res.ok)BB.innerHTML=`<div class="e">✗ ${res.msg}</div>`;
+    else{const W=buildAdvice(res);
+      BB.innerHTML=`<div class="ok" style="margin-bottom:6px">✓ Legal, stable and analysable.</div>`+
+        (W.length?W.map(w=>`<div class="w">! ${w}</div>`).join(''):`<div class="note">No constructability concerns.</div>`);}
+  }
+  const B=$('plabBudget');
+  if(B){
+    const wU=(res.wood||0)*1000,wMax=S.pieces*S.stock*1000,pS=100*(res.sticks||0)/Math.max(1,S.maxSticks);
+    const act=S.budget==='count';
+    B.innerHTML=`
+      <div class="row"><label>Sticks used</label><span class="val"><b>${res.sticks||0}</b> of ${S.maxSticks}${act?'':' (not enforced)'}</span></div>
+      <div class="progress" style="margin:6px 0"><i style="width:${Math.min(100,pS).toFixed(1)}%;background:${pS>100?'var(--bad)':'var(--ink)'}"></i></div>
+      <div class="note" style="margin:-2px 0 8px">${S.members.length} member(s) × ${S.lam} laminated × ${S.planes} plane(s)</div>
+      <div class="row"><label>Stock length</label><span class="val">${wU.toFixed(0)} mm of ${wMax.toFixed(0)} mm${act?' (not enforced)':''}</span></div>
+      <div class="row"><label>String ties</label><span class="val">${res.nString||0}</span></div>`;
+  }
+}
+
+/* Explains, from the numbers actually computed, which setting is currently
+   controlling the answer — and therefore which ones will and will not move it. */
+function governNote(res){
+  const p=res.per[res.critIdx];if(!p)return '';
+  const mp=memProps(S.members[res.critIdx]);
+  if(p.fUnit>=0){
+    if(mp.isString) return 'Limited by a string tie breaking. Its breaking load is set per material.';
+    const wood=(mp.sigT||0)*mp.A, joint=(mp.connCap===undefined?Infinity:mp.connCap);
+    return joint<wood
+      ? `Limited by the <b>joint</b> in tension (${joint.toFixed(0)} N, below the wood's ${wood.toFixed(0)} N). Connection type, overlap and glue strength all move this.`
+      : `Limited by the <b>wood</b> tearing (${wood.toFixed(0)} N, below the joint's ${isFinite(joint)?joint.toFixed(0)+' N':'unlimited'}). Changing connection type will <i>not</i> move this until the joint becomes the weaker of the two.`;
+  }
+  if(p.why==='buckling')
+    return `Limited by <b>buckling</b> of a squeezed member (P<sub>cr</sub> = π²EI/(KL)², K = ${mp.Keff}). Sensitive to material stiffness E, member length, section and connection restraint.`;
+  if(p.why==='crushing')
+    return `Limited by the wood <b>crushing</b> (${(mp.sigC*mp.A).toFixed(0)} N). This depends on compressive strength and area only — joint settings do not touch it, so glued and pinned connections give the same answer here.`;
+  return `Limited by ${p.why}.`;
+}
+
+/* ============ TWO-WAY UI SYNC — one state, everything reads from it ============ */
+const CTRL=[ // [id, state key, kind, scale]
+  ['qDesign','design','s'],['psDesign','design','s'],
+  ['qMat','newMat','s'],['psNewMat','newMat','s'],
+  ['qConn','newConn','s'],['psNewConn','newConn','s'],
+  ['qLoad','loadType','s'],['psLoad','loadType','s'],
+  ['qHook','hookLoad','n'],['psHook','hookLoad','n'],
+  ['psSpan','span','n',1000],['psCols','cols','i'],['psRows','rows','i'],
+  ['psLam','lam','i'],['psPlanes','planes','i'],
+  ['psOv','overlap','n',1000],['psTau','tau','n',1e-6],['psLash','lashCap','n'],
+  ['psJMode','jointMode','s'],['psAxis','axis','s'],['psK','K','n'],
+  ['psPtol','plateTol','n',1000],['psTarget','target','n'],
+  ['psBud','budget','s'],['psMin','minSticks','i'],['psMax','maxSticks','i'],
+  ['psPieces','pieces','i'],['psStock','stock','n',1000],['psStr','strAllow','n'],
+  ['psMinLen','minLen','n',1000],['psMaxDeg','maxDeg','i']
+];
+function syncUI(){
+  const focused=document.activeElement;            // never overwrite what the user is typing
+  CTRL.forEach(([id,k,kind,sc])=>{const e=$(id);if(!e||e===focused)return;
+    const v=S[k];e.value=(kind==='s')?v:(sc?(v*sc):v);});
+  const sy=$('psSym');if(sy)sy.checked=S.symmetric;
+  const uk=$('psUseConnK');if(uk)uk.checked=S.useConnK;
+  const df=$('psDefl');if(df)df.checked=showDefl;
+  const cb=$('psColour');if(cb)cb.value=colourBy;
+  // per-material property fields reflect the CURRENTLY selected new-member material
+  const m=M(S.newMat);
+  const set=(id,v)=>{const e=$(id);if(e&&e!==focused)e.value=v;};
+  set('psL',(m.stickL*1000).toFixed(1));set('psW',(m.w*1000).toFixed(3));set('psT',(m.t*1000).toFixed(3));
+  set('psRho',m.rho);set('psE',(m.E/1e9).toFixed(2));
+  set('psSt',m.sigT?(m.sigT/1e6).toFixed(0):'');set('psSc',m.sigC?(m.sigC/1e6).toFixed(0):'');
+  set('psBreak',m.breaking||'');
+  const jc=M(S.newMat).w*S.overlap*S.tau;
+  set('psJcap',jc.toFixed(0));
+  const st=$('psStringRow');if(st)st.style.display=(M(S.newMat).kind==='string')?'':'none';
+  const wd=$('psWoodRow');if(wd)wd.style.display=(M(S.newMat).kind==='string')?'none':'';
+  const hk=$('qHookWrap');if(hk)hk.style.display=S.loadType==='hook'?'':'none';
+  const rp=$('qRampWrap');if(rp)rp.style.display=S.loadType==='plate'?'':'none';
+}
+function readUI(){
+  CTRL.forEach(([id,k,kind,sc])=>{const e=$(id);if(!e||e.value==='')return;
+    if(kind==='s')S[k]=e.value;
+    else{let v=parseFloat(e.value);if(!isFinite(v))return;if(sc)v/=sc;
+      S[k]=(kind==='i')?Math.round(v):v;}});
+  if(S.cols%2)S.cols++;                            // even so mid-span lands on a grid line
+  // generous limits: only what the solver and display can genuinely handle
+  S.cols=Math.max(4,Math.min(200,S.cols));
+  S.rows=Math.max(2,Math.min(100,S.rows));
+  S.lam=Math.max(1,Math.min(20,S.lam));
+  S.planes=Math.max(1,Math.min(50,S.planes));
+  S.span=Math.max(0.01,Math.min(50,S.span));       // 10 mm to 50 m
+  S.target=Math.max(1,S.target);
+  S.maxSticks=Math.max(1,S.maxSticks);S.minSticks=Math.max(0,S.minSticks);
+  const sy=$('psSym');if(sy)S.symmetric=!!sy.checked;
+  const uk=$('psUseConnK');if(uk)S.useConnK=!!uk.checked;
+  const df=$('psDefl');if(df)showDefl=!!df.checked;
+  const cb=$('psColour');if(cb)colourBy=cb.value;
+  // per-material overrides
+  const mk=S.newMat,base=MATLIB[mk],ov={};
+  const num=(id,sc2)=>{const e=$(id);if(!e||e.value==='')return null;const v=parseFloat(e.value);
+    return isFinite(v)?(sc2?v/sc2:v):null;};
+  const pairs=[['psL','stickL',1000],['psW','w',1000],['psT','t',1000],['psRho','rho',1],
+               ['psE','E',1e-9],['psSt','sigT',1e-6],['psSc','sigC',1e-6],['psBreak','breaking',1]];
+  pairs.forEach(([id,f,sc2])=>{const v=num(id,sc2);if(v!==null&&Math.abs(v-(base[f]||0))>1e-12)ov[f]=v;});
+  if(Object.keys(ov).length)S.ov[mk]=Object.assign({},S.ov[mk],ov); else delete S.ov[mk];
+  S.supL=Math.max(0,Math.min(S.cols,S.supL));S.supR=Math.max(0,Math.min(S.cols,S.supR));
+}
+/* every control funnels through here: read -> (optionally rebuild) -> sync -> redraw */
+function apply(rebuild){
+  const oldC=S.cols,oldR=S.rows,oldSupL=S.supL,oldSupR=S.supR;
+  readUI();
+  // readUI clamps the supports against the NEW grid. When the grid has changed we must
+  // hand rescaleGrid the ORIGINAL support columns, or they get mapped twice and the
+  // mirror axis lands in the wrong place (which used to collapse the truss).
+  if(!rebuild&&(oldC!==S.cols||oldR!==S.rows)){S.supL=oldSupL;S.supR=oldSupR;}
+  if(rebuild){clearOptState();buildDesign(S.design);delete WS[S.design];}
+  else if(oldC!==S.cols||oldR!==S.rows){
+    // keep the user's geometry, remapped onto the new grid, symmetry intact
+    if(!rescaleGrid(oldC,oldR,S.cols,S.rows)){
+      [...S.nodes].forEach(k=>{const[c,r]=parse(k);
+        if(c>S.cols||r>S.rows){S.nodes.delete(k);S.members=S.members.filter(m=>m.a!==k&&m.b!==k);}});
+      S.supR=Math.min(S.supR,S.cols);
+      if(S.supL===S.supR){S.supL=0;S.supR=S.cols;}
+      S.nodes.add(SUPL());S.nodes.add(SUPR());
+    }
+    if(S.symmetric) makeSymmetric();
+  }
+  clearTestState();syncUI();fit();
+}
+
+/* ============ CANVAS INTERACTION ============ */
+function nearestKey(px,py){
+  let best=null,bd=1e9;
+  for(let c=0;c<=S.cols;c++)for(let r=0;r<=S.rows;r++){
+    const s=S2(key(c,r)),d=Math.hypot(s.x-px,s.y-py);
+    if(d<bd){bd=d;best=key(c,r);}}
+  return bd<20?best:null;
+}
+function hitMember(px,py){
+  for(let i=S.members.length-1;i>=0;i--){
+    const a=S2(S.members[i].a),b=S2(S.members[i].b);
+    const dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy;
+    let t=L2?((px-a.x)*dx+(py-a.y)*dy)/L2:0;t=Math.max(0,Math.min(1,t));
+    if(Math.hypot(px-(a.x+t*dx),py-(a.y+t*dy))<9)return i;}
+  return null;
+}
+const pt=e=>{const r=cv.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+let drag=null;                       // {from, start:{x,y}, moved:false}
+cv.addEventListener('pointermove',e=>{
+  const p=pt(e),k=nearestKey(p.x,p.y);
+  if(drag){
+    if(!drag.moved&&Math.hypot(p.x-drag.start.x,p.y-drag.start.y)>6)drag.moved=true;
+    if(drag.moved&&k&&k!==drag.from){
+      if(moveNodeSym(drag.from,k)){drag.from=k;clearTestState();}
+    }
+    hoverKey=k;draw();return;
+  }
+  hoverKey=(tool==='joint'||tool==='support')?k:(k&&S.nodes.has(k)?k:null);draw();});
+cv.addEventListener('pointerup',()=>{
+  if(drag){const d=drag;drag=null;
+    if(!d.moved){                                  // a click, not a drag -> toggle the joint
+      if(S.nodes.has(d.from))delNodeSym(d.from);
+      clearTestState();
+    }
+    syncUI();draw();}
+});
+cv.addEventListener('pointerleave',()=>{if(drag){drag=null;syncUI();draw();}});
+cv.addEventListener('pointerdown',e=>{
+  if(OPT.running&&!OPT.paused)return;
+  const p=pt(e),k=nearestKey(p.x,p.y);
+  pushUndo();
+  if(tool==='joint'){
+    if(!k){undoStack.pop();return;}
+    if(S.nodes.has(k)){
+      drag={from:k,start:{x:p.x,y:p.y},moved:false};   // click = delete, drag = move
+      return;                                          // resolved on pointerup
+    }
+    addNodeSym(k);
+  } else if(tool==='member'){
+    if(!k||!S.nodes.has(k)){pending=null;undoStack.pop();draw();return;}
+    if(pending===null)pending=k;
+    else if(pending!==k){
+      const mp=M(S.newMat);
+      if(!hasMem({nodes:S.nodes,members:S.members},pending,k)&&
+         (mp.kind==='string'||mlen(pending,k)<=mp.stickL+1e-9)){
+        addMemberSym(pending,k,S.newMat,S.newConn);}
+      pending=k;
+    }
+  } else if(tool==='assign'){
+    const mi=hitMember(p.x,p.y);
+    if(mi===null){undoStack.pop();return;}
+    assignSym(S.members[mi].a,S.members[mi].b,S.newMat,S.newConn);
+  } else if(tool==='support'){
+    if(!k){undoStack.pop();return;}
+    const[c,r]=parse(k);
+    if(r!==0){undoStack.pop();alert('Supports sit on the bottom row.');return;}
+    if(Math.abs(c-S.supL)<=Math.abs(c-S.supR))S.supL=c;else S.supR=c;
+    if(S.supL===S.supR){undoStack.pop();return;}
+    S.nodes.add(SUPL());S.nodes.add(SUPR());
+  } else {
+    const mi=hitMember(p.x,p.y);
+    if(mi!==null){delMemberSym(S.members[mi].a,S.members[mi].b);}
+    else if(k&&S.nodes.has(k)&&k!==SUPL()&&k!==SUPR()){delNodeSym(k);}
+    else{undoStack.pop();return;}
+  }
+  clearTestState();syncUI();draw();
+});
+let undoStack=[];
+const PARAM_KEYS=['design','newMat','newConn','span','cols','rows','lam','planes','overlap','tau',
+  'lashCap','jointMode','axis','K','useConnK','loadType','plateTol','hookLoad','target','budget',
+  'minSticks','maxSticks','pieces','stock','strAllow','minLen','maxDeg','symmetric'];
+function snap(){
+  const p={};PARAM_KEYS.forEach(k=>p[k]=S[k]);
+  return{nodes:new Set(S.nodes),members:S.members.map(m=>({...m})),supL:S.supL,supR:S.supR,
+    design:S.design,params:p,ov:JSON.parse(JSON.stringify(S.ov||{}))};
+}
+/* Restores geometry AND every setting that affects the analysis, so a reopened
+   design reproduces exactly the numbers it was saved with. */
+function rest(s){
+  S.nodes=new Set(s.nodes);S.members=s.members.map(m=>({...m}));
+  S.supL=s.supL;S.supR=s.supR;
+  if(s.params){PARAM_KEYS.forEach(k=>{if(s.params[k]!==undefined)S[k]=s.params[k];});}
+  if(s.ov)S.ov=JSON.parse(JSON.stringify(s.ov));
+  S.design=s.design||S.design;
+}
+function pushUndo(){undoStack.push(snap());if(undoStack.length>80)undoStack.shift();}
+
+document.querySelectorAll('#plabOverlay .tool[data-pmode]').forEach(b=>b.addEventListener('click',()=>{
+  tool=b.dataset.pmode;pending=null;
+  document.querySelectorAll('#plabOverlay .tool[data-pmode]').forEach(x=>x.classList.toggle('active',x===b));
+  $('plabHint').textContent={
+    joint:'Click a grey dot to add a joint, or an existing joint to remove it. Its mirror follows automatically.',
+    member:'Click one joint then another to connect them, using the material and connection chosen above.',
+    assign:'Click a member to change it to the material and connection currently chosen above.',
+    support:'Click a bottom-row dot to move the nearer support. The span between them is what the fixture holds.',
+    erase:'Click a member to remove it, or a joint to remove it and everything attached.'
+  }[tool];draw();}));
+$('plabUndo').addEventListener('click',()=>{if(undoStack.length){rest(undoStack.pop());clearTestState();syncUI();draw();}});
+$('plabResetDesign').addEventListener('click',()=>{pushUndo();resetCurrentDesign();syncUI();fit();});
+$('plabClearTruss').addEventListener('click',()=>{
+  pushUndo();
+  S.members=[];S.nodes=new Set([SUPL(),SUPR()]);
+  clearTestState();clearOptState();syncUI();draw();
+  const h=$('plabHint');if(h)h.textContent='Board cleared back to the two supports. Place joints, then connect them with the Member tool.';
+});
+$('plabMakeSym').addEventListener('click',()=>{pushUndo();makeSymmetric();clearTestState();syncUI();draw();});
+
+/* ============ CONTROL WIRING — every control goes through apply() ============ */
+['qDesign','psDesign'].forEach(id=>{const e=$(id);if(e)e.addEventListener('change',()=>{
+  const want=e.value;      // capture BEFORE readUI, which would read the other control's stale value
+  readUI();
+  switchDesign(want);      // stashes the old workspace, clears test + optimizer, loads the new one
+  syncUI();fit();});});
+['qMat','psNewMat','qConn','psNewConn'].forEach(id=>{const e=$(id);if(e)e.addEventListener('change',()=>{
+  const want=e.value,isConn=id.includes('Conn');
+  readUI();
+  if(isConn){
+    S.newConn=want;
+    S.members.forEach(m=>m.conn=want);            // applies to the whole truss
+  } else {
+    S.newMat=want;
+    // a stick material re-materialises the whole truss; string is a tie, so it stays a
+    // per-member choice you place with the Assign tool rather than wiping every member
+    if(M(want).kind!=='string') S.members.forEach(m=>m.mat=want);
+  }
+  clearTestState();syncUI();draw();});});
+['qLoad','psLoad'].forEach(id=>{const e=$(id);if(e)e.addEventListener('change',()=>{
+  const want=e.value;readUI();S.loadType=want;rampReset();syncUI();draw();});});
+['qHook','psHook'].forEach(id=>{const e=$(id);if(e)e.addEventListener('input',()=>{
+  const v=parseFloat(e.value);if(!isFinite(v))return;readUI();S.hookLoad=v;syncUI();draw();});});
+$('psApply').addEventListener('click',()=>{apply(false);$('plabSetBack').style.display='none';});
+$('psApplyRebuild').addEventListener('click',()=>{apply(true);$('plabSetBack').style.display='none';});
+$('psClose').addEventListener('click',()=>{$('plabSetBack').style.display='none';});
+$('plabSetup').addEventListener('click',()=>{syncUI();$('plabSetBack').style.display='flex';});
+// live settings: any change inside the modal updates the model immediately
+/* While typing: update the model but DO NOT rewrite the fields, so a value like
+   1200 can be entered one digit at a time without being clamped at "1". */
+$('plabSetBack').addEventListener('input',e=>{
+  const t=e.target;if(t.tagName!=='INPUT'&&t.tagName!=='SELECT')return;
+  if(t.id==='psDesign')return;
+  if(t.value===''||t.value==='-')return;           // mid-edit, nothing to read yet
+  if(t.id==='psCols'||t.id==='psRows')return;      // grid changes are applied on commit
+  readUI();clearTestState();draw();
+});
+/* On commit (blur / Enter / dropdown change): validate, warn if nonsense, then tidy up. */
+$('plabSetBack').addEventListener('change',e=>{
+  const t=e.target;if(!t.tagName)return;
+  if(t.id==='psDesign')return;
+  if(t.tagName==='INPUT'&&t.type==='number'&&t.value!==''){
+    const v=parseFloat(t.value);
+    if(!isFinite(v)){alert('“'+t.value+'” is not a number.');}
+    else if(v<0&&t.id!=='psTarget'){alert('A negative value is not meaningful here — it has been ignored.');}
+  }
+  if(t.id==='psCols'||t.id==='psRows'){apply(false);return;}
+  readUI();clearTestState();syncUI();draw();
+});
+
+/* ramp controls */
+$('rampRun').addEventListener('click',()=>{ if(RAMP.running) rampStop(); else rampStart(); draw(); });
+$('rampReset').addEventListener('click',()=>{ rampReset(); });
+$('rampSlider').addEventListener('input',e=>{ rampStop();
+  RAMP.frac=(+e.target.value)/100; RAMP.failed=RAMP.frac>=1; draw(); });
+$('rampSpeed').addEventListener('change',e=>{RAMP.speed=+e.target.value;});
+
+/* ============ CONSTRAINED, SYMMETRIC, ANIMATED OPTIMIZER ============ */
+/* The animation deliberately paints each trial before it is judged, so the board
+   must be guaranteed to end up holding a real design. This restores the first
+   candidate in the list that actually analyses, and rebuilds as a last resort, so
+   a run can never leave the screen blank. */
+function ensureValidModel(candidates){
+  for(const c of candidates){
+    if(!c||!c.nodes||!c.members||!c.members.length)continue;
+    const bak=cloneM();
+    useM(c);
+    if(analyze().ok)return true;
+    useM(bak);
+  }
+  if(analyze().ok)return true;                      // whatever is loaded is already fine
+  const stored=WS[S.design];
+  if(stored&&stored.members&&stored.members.length){
+    const bak=cloneM();
+    S.nodes=new Set(stored.nodes);S.members=stored.members.map(m=>({...m}));
+    S.supL=stored.supL;S.supR=stored.supR;
+    if(analyze().ok)return true;
+    useM(bak);
+  }
+  buildDesign(S.design);                            // canonical geometry for this type
+  return analyze().ok;
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function cloneM(){return{nodes:new Set(S.nodes),members:S.members.map(m=>({...m}))};}
+function useM(md){S.nodes=new Set(md.nodes);S.members=md.members.map(m=>({...m}));}
+function analyzeOf(md){const bak=cloneM();useM(md);const r=analyze();useM(bak);return r;}
+
+function neighbour(md0,R){
+  const md={nodes:new Set(md0.nodes),members:md0.members.map(m=>({...m}))};
+  const ctr=mirrorCol();
+  const free=[...md.nodes].filter(n=>n!==SUPL()&&n!==SUPR());
+  const roll=R();
+  if(roll<0.30&&free.length){                                  // move a mirror pair
+    const n=free[Math.floor(R()*free.length)],[c,r]=parse(n);
+    const d=[[1,0],[-1,0],[0,1],[0,-1]][Math.floor(R()*4)];
+    const mv=k=>{const[kc,kr]=parse(k);const dc=kc<ctr?d[0]:(kc>ctr?-d[0]:0);return key(kc+dc,kr+d[1]);};
+    const pair=(S.symmetric&&mirror(n)!==n)?[n,mirror(n)]:[n];
+    const tgt=pair.map(mv);
+    for(const t of tgt){const[tc,tr]=parse(t);
+      if(tc<0||tc>S.cols||tr<0||tr>S.rows)return null;
+      if(md.nodes.has(t)&&!pair.includes(t))return null;}
+    pair.forEach(k=>md.nodes.delete(k));tgt.forEach(k=>md.nodes.add(k));
+    md.members=md.members.map(m=>{let a=m.a,b=m.b;
+      pair.forEach((k,i)=>{if(a===k)a=tgt[i];if(b===k)b=tgt[i];});return{...m,a,b};});
+    return md;
+  }
+  if(roll<0.48){                                               // change a member's material
+    if(!md.members.length)return null;
+    const i=Math.floor(R()*md.members.length),m=md.members[i];
+    const opts=Object.keys(MATLIB).filter(k=>k!==m.mat);
+    const nm=opts[Math.floor(R()*opts.length)];
+    const set=x=>{x.mat=nm;};set(md.members[i]);
+    if(S.symmetric){const p=md.members.find(x=>sameEdge(x,mirror(m.a),mirror(m.b)));if(p)set(p);}
+    return md;
+  }
+  if(roll<0.72){                                               // swap a member pair
+    if(md.members.length<4)return null;
+    const i=Math.floor(R()*md.members.length),m=md.members[i];
+    const drop=[m];if(S.symmetric){const p=md.members.find(x=>x!==m&&sameEdge(x,mirror(m.a),mirror(m.b)));if(p)drop.push(p);}
+    md.members=md.members.filter(x=>!drop.includes(x));
+    const arr=[...md.nodes];
+    const a=arr[Math.floor(R()*arr.length)],b=arr[Math.floor(R()*arr.length)];
+    if(a===b||hasMem(md,a,b))return null;
+    const mat=m.mat;
+    if(M(mat).kind!=='string'&&mlen(a,b)>M(mat).stickL)return null;
+    md.members.push({a,b,mat,conn:m.conn});
+    if(S.symmetric){const ma=mirror(a),mb=mirror(b);
+      if(!(ma===a&&mb===b)&&md.nodes.has(ma)&&md.nodes.has(mb)&&!hasMem(md,ma,mb))
+        md.members.push({a:ma,b:mb,mat,conn:m.conn});}
+    return md;
+  }
+  if(roll<0.90){                                               // add a joint pair with two members
+    const cands=[];
+    for(let c=0;c<=S.cols;c++)for(let r=0;r<=S.rows;r++){const k=key(c,r);if(!md.nodes.has(k))cands.push(k);}
+    if(!cands.length)return null;
+    const nk=cands[Math.floor(R()*cands.length)];
+    const mat=S.newMat,mp=M(mat);
+    const near=[...md.nodes].filter(n=>mlen(n,nk)<=mp.stickL&&mlen(n,nk)>1e-9);
+    if(near.length<2)return null;
+    const a=near[Math.floor(R()*near.length)],b=near[Math.floor(R()*near.length)];
+    if(a===b)return null;
+    md.nodes.add(nk);md.members.push({a:nk,b:a,mat,conn:S.newConn},{a:nk,b:b,mat,conn:S.newConn});
+    if(S.symmetric){const mk=mirror(nk),ma=mirror(a),mb=mirror(b);
+      const[mc,mr]=parse(mk);
+      if(mk!==nk&&mc>=0&&mc<=S.cols&&mr>=0&&mr<=S.rows&&md.nodes.has(ma)&&md.nodes.has(mb)){
+        md.nodes.add(mk);md.members.push({a:mk,b:ma,mat,conn:S.newConn},{a:mk,b:mb,mat,conn:S.newConn});}
+      else return null;}
+    return md;
+  }
+  const deg=degMap(md);                                        // remove a degree-2 pair
+  const two=free.filter(n=>deg[n]===2);
+  if(!two.length)return null;
+  const n=two[Math.floor(R()*two.length)];
+  const ks=S.symmetric?[n,mirror(n)]:[n];
+  for(const x of ks){if(x===SUPL()||x===SUPR())continue;
+    md.nodes.delete(x);md.members=md.members.filter(m=>m.a!==x&&m.b!==x);}
+  return md;
+}
+function score(r){
+  if(!r.ok)return -Infinity;
+  // reach the target first; beyond it prefer fewer sticks and lighter structures
+  const reach=Math.min(r.capacity,S.target);
+  const beyond=Math.max(0,r.capacity-S.target);
+  return reach + 0.25*beyond - 0.004*S.target*(r.sticks/Math.max(1,S.maxSticks)) - 0.05*r.weightG;
+}
+const OPT={token:0,lastLog:null,lastSummary:null,log:[],running:false,paused:false,iter:0,max:250,delay:40,student:null,studentR:null,
+  cur:null,curR:null,best:null,bestR:null,kept:0,disc:0,hist:[],last:'',verdict:'',timer:null,rng:null};
+function clearOptState(){
+  if(OPT.timer)clearTimeout(OPT.timer);
+  OPT.token++;                                        // stale callbacks become no-ops
+  if(OPT.log.length>1&&!OPT.lastLog)OPT.lastLog=OPT.log.slice();
+  OPT.running=false;OPT.paused=false;OPT.iter=0;OPT.kept=0;OPT.disc=0;OPT.hist=[];
+  OPT.student=null;OPT.studentR=null;OPT.best=null;OPT.bestR=null;OPT.cur=null;OPT.curR=null;OPT.last='';OPT.log=[];
+  const a=$('optHist'),b=$('optCompare'),c=$('optStats'),d=$('optBar');
+  if(a)a.innerHTML='';if(b)b.innerHTML='';if(c)c.innerHTML='';if(d)d.style.width='0%';
+  optBtns();
+}
+const MOVES=['moved a joint pair','changed a member material','swapped a member pair','added a joint pair','removed a joint pair'];
+function optBtns(){
+  $('optRun').disabled=OPT.running&&!OPT.paused;
+  $('optPause').disabled=!OPT.running;$('optPause').textContent=OPT.paused?'Resume':'Pause';
+  $('optReset').disabled=!OPT.student;$('optAccept').disabled=!OPT.best;$('optRevert').disabled=!OPT.student;
+}
+function optStats(done){
+  const bc=OPT.bestR?OPT.bestR.capacity:0,hit=bc>=S.target;
+  $('optStats').innerHTML=`
+    <div style="font-family:var(--display);font-weight:700;font-size:12px;margin-bottom:4px">
+      ${done?'OPTIMIZATION COMPLETE':(OPT.paused?'PAUSED':'OPTIMIZATION IN PROGRESS…')}</div>
+    <table class="results" style="font-size:11.5px">
+      <tr><td>Iteration</td><td>${OPT.iter} / ${OPT.max}</td></tr>
+      <tr><td>Current capacity</td><td>${OPT.curR?OPT.curR.capacity.toFixed(0)+' N':'—'}</td></tr>
+      <tr><td>Best capacity</td><td><b>${bc?bc.toFixed(0)+' N ('+(bc/LBF).toFixed(0)+' lbf)':'—'}</b></td></tr>
+      <tr><td>Best sticks</td><td>${OPT.bestR?OPT.bestR.sticks+' of '+S.maxSticks:'—'}</td></tr>
+      <tr><td>Best weight</td><td>${OPT.bestR?OPT.bestR.weightG.toFixed(1)+' g':'—'}</td></tr>
+      <tr><td>Strength / weight</td><td>${OPT.bestR?OPT.bestR.sw.toFixed(1)+' N/g':'—'}</td></tr>
+      <tr><td>Target ${(S.target/LBF).toFixed(0)} lbf</td><td>${hit?'<b style="color:var(--ok)">reached</b>':'<span style="color:var(--bad)">not yet</span>'}</td></tr>
+      <tr><td>Kept / discarded</td><td>${OPT.kept} / ${OPT.disc}</td></tr>
+      <tr><td>Log rows</td><td>${OPT.log.length}</td></tr>
+    </table>
+    ${OPT.last?`<div class="note" style="margin-top:5px">Last change: ${OPT.last} — <b style="color:${OPT.verdict==='kept'?'var(--ok)':'var(--bad)'}">${OPT.verdict}</b></div>`:''}`;
+  $('optBar').style.width=(100*OPT.iter/OPT.max).toFixed(1)+'%';
+}
+function optHistTable(){
+  const el=$('optHist');if(!OPT.hist.length){el.innerHTML='';return;}
+  let h=`<div class="note" style="margin-top:10px"><b>Optimization history</b></div>
+    <table class="results" style="font-size:11.5px"><tr><th>Iter</th><th>Sticks</th><th>Weight</th><th>Capacity</th><th>N/g</th></tr>`;
+  if(OPT.studentR)h+=`<tr style="background:#FFFDF6"><td>initial</td><td>${OPT.studentR.sticks}</td><td>${OPT.studentR.weightG.toFixed(1)} g</td><td><b>${OPT.studentR.capacity.toFixed(0)} N</b></td><td>${OPT.studentR.sw.toFixed(1)}</td></tr>`;
+  OPT.hist.slice(-10).forEach(x=>h+=`<tr><td>${x.i}</td><td>${x.st}</td><td>${x.g.toFixed(1)} g</td><td><b>${x.c.toFixed(0)} N</b></td><td>${x.sw.toFixed(1)}</td></tr>`);
+  if(OPT.bestR)h+=`<tr style="background:#EFF7F1"><td><b>best</b></td><td>${OPT.bestR.sticks}</td><td>${OPT.bestR.weightG.toFixed(1)} g</td><td><b>${OPT.bestR.capacity.toFixed(0)} N</b></td><td>${OPT.bestR.sw.toFixed(1)}</td></tr>`;
+  h+='</table>';
+  h+=`<div class="note" style="margin-top:6px">Showing improvements only (last 10). The downloadable log holds
+      all <b>${OPT.log.length}</b> recorded trials, including the ${OPT.disc} that were discarded.</div>`;
+  el.innerHTML=h;
+}
+function mini(md,base){
+  const W=136,H=72,pad=7;
+  const s=Math.min((W-2*pad)/(S.cols*pitch()),(H-2*pad)/(S.rows*pitch()));
+  const px=k=>{const p=xyOf(k);return[pad+p.x*s,H-pad-p.y*s];};
+  const dr=(m,c1,c2,w)=>m.members.map(t=>{const[ax,ay]=px(t.a),[bx,by]=px(t.b);
+    const str=M(t.mat).kind==='string';
+    return `<line x1="${ax.toFixed(1)}" y1="${ay.toFixed(1)}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="${str?c2:c1}" stroke-width="${str?w*0.6:w}" ${str?'stroke-dasharray="3 2"':''} stroke-linecap="round"/>`;}).join('');
+  return `<svg width="${W}" height="${H}" style="background:#F7F8F5;border:1px solid #D3D9E1;border-radius:4px">${dr(base,'#C9D0D9','#C9D0D9',3)}${dr(md,'#17263B','#1F8A4C',2)}</svg>`;
+}
+function whyBetter(a,b){
+  const p=[];const dc=b.capacity-a.capacity;
+  if(Math.abs(dc)>1)p.push(`${dc>0?'+':''}${dc.toFixed(0)} N capacity`);
+  const ds=b.sticks-a.sticks;if(ds)p.push(`${Math.abs(ds)} ${ds<0?'fewer':'more'} stick(s)`);
+  const dg=b.weightG-a.weightG;if(Math.abs(dg)>0.2)p.push(`${dg>0?'+':''}${dg.toFixed(1)} g`);
+  if(b.mode!==a.mode)p.push(`now limited by ${b.mode} instead of ${a.mode}`);
+  if(a.maxCompL>0&&b.maxCompL<a.maxCompL-1e-6)p.push(`longest squeezed member ${(a.maxCompL*1000).toFixed(0)}→${(b.maxCompL*1000).toFixed(0)} mm`);
+  return p.join(' · ')||'very similar';
+}
+function optCompare(){
+  const el=$('optCompare');if(!OPT.student||!OPT.best){el.innerHTML='';return;}
+  const a=OPT.studentR,b=OPT.bestR;
+  const row=(l,x)=>`<tr><td>${l}</td><td>${x.sticks}</td><td>${x.weightG.toFixed(1)} g</td><td><b>${x.capacity.toFixed(0)} N</b></td><td>${(x.capacity/LBF).toFixed(0)}</td><td>${x.sw.toFixed(1)}</td><td style="color:${x.capacity>=S.target?'var(--ok)':'var(--bad)'}">${x.capacity>=S.target?'yes':'no'}</td></tr>`;
+  el.innerHTML=`<div class="note" style="margin-top:10px"><b>Your design vs the candidate</b></div>
+    <div style="display:flex;gap:8px;margin:6px 0">
+      <div style="text-align:center"><div class="note">yours</div>${mini(OPT.student,OPT.student)}</div>
+      <div style="text-align:center"><div class="note">candidate</div>${mini(OPT.best,OPT.student)}</div></div>
+    <table class="results" style="font-size:11.5px">
+      <tr><th>Design</th><th>Sticks</th><th>Weight</th><th>Capacity</th><th>lbf</th><th>N/g</th><th>Target</th></tr>
+      ${row('Yours',a)}${row('Candidate',b)}</table>
+    <div class="note" style="margin-top:6px">${whyBetter(a,b)}</div>`;
+}
+/* One row of the optimization log. Every trial is recorded — kept, discarded or
+   rejected as unbuildable — so the whole search is reviewable afterwards. */
+function logRow(iter,move,outcome,r,isBest){
+  return {iter,move,outcome,
+    valid:r&&r.ok?1:0,
+    sticks:r&&r.ok?r.sticks:'',
+    weight:r&&r.ok?r.weightG:'',
+    capacity:r&&r.ok?r.capacity:'',
+    sw:r&&r.ok?r.sw:'',
+    critical:r&&r.ok?r.critical:'',
+    mode:r&&r.ok?r.mode:'',
+    joints:r&&r.ok?r.joints:'',
+    members:r&&r.ok?r.nMembers:'',
+    target:r&&r.ok?(r.capacity>=S.target?1:0):'',
+    best:isBest?1:0,
+    reason:r&&r.ok?'':(r?String(r.msg).replace(/"/g,"'"):'')};
+}
+function optTick(tok){
+  if(tok!==undefined&&tok!==OPT.token)return;        // callback from a finished run: ignore
+  if(!OPT.running||OPT.paused)return;
+  if(OPT.iter>=OPT.max){optDone();return;}
+  OPT.iter++;
+  const R=OPT.rng;
+  let trial=null,tries=0;while(!trial&&tries++<12)trial=neighbour(OPT.cur,R);
+  if(!trial){OPT.disc++;OPT.timer=setTimeout(()=>optTick(myTok),4);return;}
+  const r=analyzeOf(trial);
+  useM(trial);
+  OPT.last=MOVES[Math.floor(R()*MOVES.length)];
+  const myTok=OPT.token;
+  const back=()=>{ if(myTok!==OPT.token||!OPT.running)return;   // never clobber a finished result
+    useM(OPT.cur);draw();optStats(false);
+    OPT.timer=setTimeout(()=>optTick(myTok),Math.max(4,OPT.delay/3));};
+  if(!r.ok){OPT.disc++;OPT.last='a change that would not be buildable';OPT.verdict='discarded';
+    OPT.log.push(logRow(OPT.iter,OPT.last,'rejected — not buildable',r,false));
+    draw();optStats(false);OPT.timer=setTimeout(back,Math.max(6,OPT.delay/2));return;}
+  const keep=score(r)>score(OPT.curR)||R()<0.05;
+  let newBest=false;
+  if(keep){
+    OPT.kept++;OPT.verdict='kept';OPT.cur=trial;OPT.curR=r;
+    if(!OPT.bestR||score(r)>score(OPT.bestR)){
+      newBest=true;
+      OPT.best={nodes:new Set(trial.nodes),members:trial.members.map(m=>({...m}))};OPT.bestR=r;
+      OPT.hist.push({i:OPT.iter,c:r.capacity,st:r.sticks,g:r.weightG,sw:r.sw});optHistTable();}
+    OPT.log.push(logRow(OPT.iter,OPT.last,newBest?'kept — new best':'kept',r,newBest));
+    draw();optStats(false);OPT.timer=setTimeout(()=>optTick(myTok),OPT.delay);
+  } else {OPT.disc++;OPT.verdict='discarded';
+    OPT.log.push(logRow(OPT.iter,OPT.last,'discarded — no improvement',r,false));
+    draw();optStats(false);
+    OPT.timer=setTimeout(back,Math.max(6,OPT.delay/2));}
+}
+function optDone(){
+  OPT.running=false;OPT.paused=false;
+  OPT.token++;                                        // invalidate any callback still in flight
+  if(OPT.timer)clearTimeout(OPT.timer);
+  OPT.lastLog=OPT.log.slice();                        // keep it downloadable after a design switch
+  OPT.lastSummary={design:S.design,iters:OPT.iter,kept:OPT.kept,disc:OPT.disc,
+    start:OPT.studentR?OPT.studentR.capacity:null,best:OPT.bestR?OPT.bestR.capacity:null};
+  // Always land on a real design: the winner if there is one, otherwise exactly the
+  // design the run started from. Previously, a run that found no improvement left the
+  // last (rejected) trial on the board, which is what blanked the screen.
+  const improved=!!(OPT.best&&OPT.bestR&&OPT.studentR&&score(OPT.bestR)>score(OPT.studentR)+1e-9);
+  ensureValidModel([OPT.best,OPT.student]);
+  WS[S.design]={nodes:new Set(S.nodes),members:S.members.map(m=>({...m})),supL:S.supL,supR:S.supR};
+  clearTestState();                                   // any earlier test result belonged to the old shape
+  draw();optStats(true);optCompare();optBtns();
+  const el=$('optStats');
+  if(improved&&OPT.bestR){
+    el.innerHTML+=`<div class="note" style="margin-top:6px;color:var(--ok)"><b>The optimized design is now the active design.</b>
+      Run the load test to take it to failure, save it, or keep editing it by hand.
+      ${OPT.bestR.capacity>=S.target?'Target reached.':'Target not reached — try more iterations, a deeper truss, or a bigger stick budget.'}</div>`;
+  } else {
+    el.innerHTML+=`<div class="note" style="margin-top:6px;color:var(--warn)"><b>No better design was found near this one.</b>
+      Your design has been left exactly as it was — nothing was lost. That is a real result: it often means the
+      current shape is already well arranged for this stick budget. Try more iterations, a different starting
+      geometry, a deeper truss, or a larger budget.</div>`;
+  }
+}
+function optStart(){
+  const r=analyze();
+  if(!r.ok){alert('Make the design analysable before optimizing:\n\n'+r.msg);return;}
+  rampStop();clearTestState();                        // never let a running test fight the optimizer
+  if(OPT.running&&OPT.paused){OPT.paused=false;optBtns();optTick();return;}
+  OPT.student=cloneM();OPT.studentR=r;OPT.cur=cloneM();OPT.curR=r;
+  // Seed the incumbent with the starting design: a run can then only ever finish on
+  // something that scores at least as well, so optimizing repeatedly never degrades it.
+  OPT.best=cloneM();OPT.bestR=r;
+  OPT.iter=0;OPT.kept=0;OPT.disc=0;OPT.hist=[];OPT.log=[];
+  OPT.max=Math.max(20,+$('optIters').value||250);OPT.delay=+$('optSpeed').value||40;
+  OPT.rng=mulberry32(Date.now()&0xffff);OPT.token++;OPT.running=true;OPT.paused=false;
+  OPT.log.push(logRow(0,'starting design','baseline',r,true));
+  optBtns();optHistTable();$('optCompare').innerHTML='';optTick(OPT.token);
+}
+$('optRun').addEventListener('click',optStart);
+$('optPause').addEventListener('click',()=>{if(!OPT.running)return;OPT.paused=!OPT.paused;optBtns();optStats(false);
+  if(!OPT.paused)optTick(OPT.token);else if(OPT.timer)clearTimeout(OPT.timer);});
+$('optReset').addEventListener('click',()=>{if(OPT.timer)clearTimeout(OPT.timer);
+  OPT.token++;
+  OPT.running=false;OPT.paused=false;OPT.iter=0;OPT.hist=[];OPT.kept=0;OPT.disc=0;OPT.last='';
+  ensureValidModel([OPT.student,OPT.best]);
+  OPT.best=null;OPT.bestR=null;
+  WS[S.design]={nodes:new Set(S.nodes),members:S.members.map(m=>({...m})),supL:S.supL,supR:S.supR};
+  $('optHist').innerHTML='';$('optCompare').innerHTML='';$('optBar').style.width='0%';
+  $('optStats').innerHTML='<div class="note">Reset — your design is back.</div>';optBtns();rampReset();draw();});
+$('optAccept').addEventListener('click',()=>{if(!OPT.best)return;pushUndo();useM(OPT.best);
+  rampReset();syncUI();draw();$('optStats').innerHTML='<div class="note">Candidate accepted. Keep editing it by hand, or optimize again from here.</div>';});
+$('optRevert').addEventListener('click',()=>{if(!OPT.student)return;pushUndo();useM(OPT.student);
+  rampReset();syncUI();draw();$('optStats').innerHTML='<div class="note">Your original design is back.</div>';});
+function optLogCsv(rows){
+  rows=rows||OPT.log;
+  const L=[];
+  L.push('OPTIMIZATION LOG');
+  L.push('generated,'+new Date().toLocaleString());
+  L.push('design type,'+S.design);
+  L.push('support span_mm,'+(S.span*1000).toFixed(1));
+  L.push('grid divisions,'+S.cols+',rows,'+S.rows);
+  L.push('member material,'+M(S.newMat).label+',connection,'+CONNLIB[S.newConn].label);
+  L.push('lamination,'+S.lam+',truss planes,'+S.planes);
+  L.push('buckling axis,'+(S.axis==='in'?'in-plane (braced)':'out-of-plane')+',K from connection,'+(S.useConnK?'yes':'no, K='+S.K));
+  L.push('joint limit applies to,'+S.jointMode);
+  L.push('stick budget,'+S.minSticks+' to '+S.maxSticks);
+  L.push('target load_N,'+S.target.toFixed(2)+',target load_lbf,'+(S.target/LBF).toFixed(1));
+  const sm=OPT.lastSummary;
+  L.push('iterations requested,'+OPT.max+',kept,'+(OPT.kept||(sm?sm.kept:''))+',discarded,'+(OPT.disc||(sm?sm.disc:'')));
+  if(sm)L.push('logged run,design '+sm.design+',iterations '+sm.iters);
+  if(OPT.studentR)L.push('starting capacity_N,'+OPT.studentR.capacity.toFixed(1));
+  if(OPT.bestR)L.push('best capacity_N,'+OPT.bestR.capacity.toFixed(1)+',improvement_pct,'+
+    (OPT.studentR?(100*(OPT.bestR.capacity/OPT.studentR.capacity-1)).toFixed(1):''));
+  L.push('');
+  L.push('note,"Every trial is listed: kept, discarded, or rejected as unbuildable.'+
+         ' Member forces in a determinate truss depend on geometry and load only, so capacity changes'+
+         ' come from geometry, material, section and connection - not from stiffness redistribution."');
+  L.push('');
+  L.push(['iteration','change_tried','outcome','buildable','sticks','weight_g','capacity_N','capacity_lbf',
+          'strength_to_weight_N_per_g','joints','members','critical_member','failure_mode','target_met',
+          'new_best','reason_if_rejected'].join(','));
+  rows.forEach(x=>L.push([x.iter,'"'+x.move+'"','"'+x.outcome+'"',x.valid,x.sticks,
+    x.weight===''?'':(+x.weight).toFixed(2),
+    x.capacity===''?'':(+x.capacity).toFixed(1),
+    x.capacity===''?'':((+x.capacity)/LBF).toFixed(2),
+    x.sw===''?'':(+x.sw).toFixed(3),
+    x.joints,x.members,x.critical,'"'+x.mode+'"',x.target,x.best,'"'+x.reason+'"'].join(',')));
+  return L.join('\n');
+}
+$('optDlLog').addEventListener('click',()=>{
+  const rows=OPT.log.length?OPT.log:(OPT.lastLog||[]);
+  if(!rows.length){alert('Run an optimization first — then the full iteration log can be downloaded.');return;}
+  dl(optLogCsv(rows),'optimization_log.csv');
+});
+$('optAnalyze').addEventListener('click',()=>{const r=analyze();draw();
+  $('optStats').innerHTML=r.ok?`<div class="note"><b>${r.capacity.toFixed(0)} N</b> (${(r.capacity/LBF).toFixed(0)} lbf) · ${r.sticks} sticks · ${r.weightG.toFixed(1)} g · ${r.sw.toFixed(1)} N/g · first failure ${mName(S.members[r.critIdx])} by ${r.mode}</div>`:`<div class="msg-bad">${r.msg}</div>`;});
+
+/* ============ saved designs + exports ============ */
+let history=[];
+function renderHistory(){
+  const el=$('plabHistory');
+  if(!history.length){el.innerHTML='<div class="note">Nothing saved yet. Saving stores the geometry <i>and</i> every setting that affects the analysis, so a design reopens exactly as you left it.</div>';return;}
+  let h='<table class="results"><tr><th>#</th><th>Name</th><th>Capacity</th><th>lbf</th><th>Sticks</th><th></th></tr>';
+  history.forEach((it,k)=>h+=`<tr><td>${k+1}</td><td style="font-family:var(--body);font-size:11.5px">${it.name}</td>`+
+    `<td><b>${it.r.capacity.toFixed(0)} N</b></td><td>${(it.r.capacity/LBF).toFixed(0)}</td><td>${it.r.sticks}</td>`+
+    `<td><button class="chipbtn" data-hl="${k}">Open</button> <button class="chipbtn danger" data-hdel="${k}">✕</button></td></tr>`);
+  el.innerHTML=h+'</table>'+
+    '<div class="note" style="margin-top:6px">Opening a design makes it the active one — you can edit it, analyse it, run the load test on it, or optimize it further.</div>';
+}
+function openSaved(i){
+  const it=history[i];if(!it)return false;
+  pushUndo();rest(it.md);clearTestState();clearOptState();
+  WS[S.design]={nodes:new Set(S.nodes),members:S.members.map(m=>({...m})),supL:S.supL,supR:S.supR};
+  syncUI();fit();
+  const st=$('optStats');
+  if(st)st.innerHTML=`<div class="note">Opened “${it.name}” — ${it.r.capacity.toFixed(0)} N (${(it.r.capacity/LBF).toFixed(0)} lbf), `+
+    `${it.r.sticks} sticks. Geometry and all settings restored; it is now the active design.</div>`;
+  return true;
+}
+function deleteSaved(i){history.splice(i,1);renderHistory();}
+/* delegated, so the buttons keep working after every re-render */
+$('plabHistory').addEventListener('click',e=>{
+  const t=e.target;if(!t||!t.dataset)return;
+  if(t.dataset.hl!==undefined)openSaved(+t.dataset.hl);
+  else if(t.dataset.hdel!==undefined)deleteSaved(+t.dataset.hdel);
+});
+$('plabSave').addEventListener('click',()=>{const r=analyze();
+  if(!r.ok){alert('Make the design analysable first:\n\n'+r.msg);return;}
+  const isOpt=OPT.bestR&&Math.abs(OPT.bestR.capacity-r.capacity)<1e-6;
+  const name=(isOpt?'Optimized ':'')+S.design+' · '+r.capacity.toFixed(0)+' N';
+  history.push({md:snap(),r,name,time:new Date().toLocaleTimeString()});renderHistory();
+  $('plabSave').textContent='Saved ✓';setTimeout(()=>$('plabSave').textContent='Save this design',1200);});
+$('plabClearHist').addEventListener('click',()=>{history=[];renderHistory();});
+function dl(t,n,mime){const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([t],{type:mime||'text/csv'}));a.download=n;a.click();}
+/* A complete, reopenable design file: geometry + every analysis setting + the
+   results it produced, so a student can hand it in and it reopens identically. */
+function designJson(){
+  const r=analyze(),sn=snap();
+  return JSON.stringify({
+    format:'truss-build-lab/design',version:2,saved:new Date().toISOString(),
+    design:sn.design,
+    geometry:{nodes:[...sn.nodes],members:sn.members,supportLeftCol:sn.supL,supportRightCol:sn.supR},
+    settings:sn.params, materialOverrides:sn.ov,
+    predicted:r.ok?{failure_load_N:+r.capacity.toFixed(2),failure_load_lbf:+(r.capacity/LBF).toFixed(2),
+      sticks:r.sticks,weight_g:+r.weightG.toFixed(2),strength_to_weight_N_per_g:+r.sw.toFixed(3),
+      first_member_to_fail:r.critical,failure_mode:r.mode,
+      deflection_at_failure_mm:+(r.dUnit*r.capacity*1000).toFixed(3)}:{invalid:r.msg},
+    savedDesigns:history.map(h=>({name:h.name,capacity_N:+h.r.capacity.toFixed(1),sticks:h.r.sticks,
+      geometry:{nodes:[...h.md.nodes],members:h.md.members,supportLeftCol:h.md.supL,supportRightCol:h.md.supR},
+      settings:h.md.params,materialOverrides:h.md.ov})),
+    optimizationLog:OPT.log
+  },null,2);
+}
+function loadDesignJson(txt){
+  let d;try{d=JSON.parse(txt);}catch(e){alert('That file is not valid JSON.');return false;}
+  const g=d.geometry;
+  if(!g||!Array.isArray(g.nodes)||!Array.isArray(g.members)){alert('That file does not contain a truss design.');return false;}
+  pushUndo();
+  rest({nodes:new Set(g.nodes),members:g.members.map(m=>({...m})),
+        supL:g.supportLeftCol,supR:g.supportRightCol,design:d.design||'custom',
+        params:d.settings,ov:d.materialOverrides});
+  if(Array.isArray(d.savedDesigns)){
+    d.savedDesigns.forEach(sd=>{
+      if(!sd.geometry)return;
+      const md={nodes:new Set(sd.geometry.nodes),members:sd.geometry.members.map(m=>({...m})),
+        supL:sd.geometry.supportLeftCol,supR:sd.geometry.supportRightCol,
+        design:d.design||'custom',params:sd.settings,ov:sd.materialOverrides};
+      const bak=snap();rest(md);const r=analyze();rest(bak);
+      if(r.ok)history.push({md,r,name:sd.name||'imported',time:new Date().toLocaleTimeString()});
+    });
+  }
+  clearTestState();clearOptState();
+  WS[S.design]={nodes:new Set(S.nodes),members:S.members.map(m=>({...m})),supL:S.supL,supR:S.supR};
+  renderHistory();syncUI();fit();
+  const r=analyze();
+  const st=$('optStats');
+  if(st)st.innerHTML=`<div class="note">Design file opened${r.ok?` — ${r.capacity.toFixed(0)} N (${(r.capacity/LBF).toFixed(0)} lbf)`:''}. `+
+    `Geometry, settings and any saved designs were restored. It is now the active design.</div>`;
+  return true;
+}
+$('plabExportDesign').addEventListener('click',()=>dl(designJson(),'truss_design.json','application/json'));
+$('plabImportBtn').addEventListener('click',()=>{const f=$('plabImportFile');if(f)f.click();});
+$('plabImportFile').addEventListener('change',e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>loadDesignJson(String(rd.result));
+  rd.readAsText(f);e.target.value='';
+});
+/* every saved design as one CSV, for marking or comparison */
+$('plabSavedCsv').addEventListener('click',()=>{
+  if(!history.length){alert('Save at least one design first.');return;}
+  const L=['#,name,time,capacity_N,capacity_lbf,sticks,weight_g,N_per_g,first_to_fail,failure_mode,joints,members,target_met,measured_N,notes'];
+  history.forEach((h,k)=>L.push([k+1,'"'+h.name+'"',h.time||'',h.r.capacity.toFixed(1),
+    (h.r.capacity/LBF).toFixed(2),h.r.sticks,h.r.weightG.toFixed(2),h.r.sw.toFixed(3),
+    h.r.critical,'"'+h.r.mode+'"',h.r.joints,h.r.nMembers,h.r.capacity>=S.target?1:0,'',''].join(',')));
+  dl(L.join('\n'),'saved_designs.csv');
+});
+$('plabSheet').addEventListener('click',()=>{
+  const r=analyze();if(!r.ok){alert('Design is not analysable:\n\n'+r.msg);return;}
+  const L=['TRUSS BUILD SHEET','Generated,'+new Date().toLocaleString(),'',
+    'PREDICTED,value,unit',
+    `Failure load,${r.capacity.toFixed(1)},N`,`Failure load,${(r.capacity/LBF).toFixed(1)},lbf`,
+    `First member to fail,${mName(S.members[r.critIdx])},`,`Failure mode,${r.mode},`,
+    `Deflection at failure,${(r.dUnit*r.capacity*1000).toFixed(2)},mm`,
+    `Sticks used,${r.sticks},`,`Weight,${r.weightG.toFixed(2)},g`,
+    `Support span,${(S.span*1000).toFixed(1)},mm`,`Truss planes,${S.planes},`,
+    `Loading,${S.loadType==='plate'?'Instron compression plate':'Hanging hook'},`,'',
+    'MEASURED — fill in during the test,value,unit',
+    'Actual failure load,,N','Actual failure load,,lbf','Which member failed first?,,',
+    'Failure mode observed,,','Measured / predicted,,','Why did they differ?,,','',
+    'MEMBER SCHEDULE',
+    'member,material,connection,from,to,length_mm,force_at_failure_N,state,capacity_N,limited_by,utilisation'];
+  r.per.forEach(p=>{const F=p.fUnit*r.capacity;
+    L.push([mName(S.members[p.i]),M(S.members[p.i].mat).label,CONNLIB[S.members[p.i].conn||'glue'].label,
+      labelOf(S.members[p.i].a),labelOf(S.members[p.i].b),(p.L*1000).toFixed(1),F.toFixed(1),
+      p.zero?'idle':(F>0?'pulled':'squeezed'),p.cap.toFixed(1),p.why,
+      p.cap>0?(Math.abs(F)/p.cap).toFixed(3):'-'].join(','));});
+  L.push('','JOINTS','joint,x_mm,y_mm');
+  [...S.nodes].forEach(k=>{const p=xyOf(k);L.push(`${labelOf(k)},${(p.x*1000).toFixed(1)},${(p.y*1000).toFixed(1)}`);});
+  L.push('','ASSUMPTIONS,,',`Buckling axis,${S.axis==='in'?'in-plane (braced)':'out-of-plane'},`,
+    `Effective length factor K,${S.K},`,`Joint limit applies to,${S.jointMode},`,
+    `Joint overlap,${(S.overlap*1000).toFixed(0)},mm`,`Glue shear strength,${(S.tau/1e6).toFixed(1)},MPa`,
+    `Lamination,${S.lam},sticks per member`);
+  dl(L.join('\n'),'truss_build_sheet.csv');});
+$('plabCompare').addEventListener('click',()=>{
+  if(!history.length){alert('Save at least one design first.');return;}
+  const L=['design,capacity_N,capacity_lbf,sticks,weight_g,N_per_g,first_failure,mode,measured_N,notes'];
+  history.forEach((it,k)=>L.push([`Design ${k+1}`,it.r.capacity.toFixed(1),(it.r.capacity/LBF).toFixed(1),
+    it.r.sticks,it.r.weightG.toFixed(2),it.r.sw.toFixed(1),it.r.critical,it.r.mode,'',''].join(',')));
+  dl(L.join('\n'),'design_comparison.csv');});
+
+/* ============ open / close ============ */
+let opened=false;
+$('plabBtn').addEventListener('click',()=>{
+  $('plabOverlay').style.display='flex';
+  if(!opened){S.design='general';buildDesign('general');clearTestState();syncUI();renderHistory();opened=true;}
+  fit();});
+$('plabExit').addEventListener('click',()=>{rampStop();$('plabOverlay').style.display='none';});
+window.addEventListener('resize',()=>{if($('plabOverlay').style.display!=='none')fit();});
+globalThis.__plab={S,WS,MATLIB,CONNLIB,optLogCsv,ensureValidModel,stashWorkspace,openSaved,deleteSaved,designJson,loadDesignJson,snap,rest,governNote,memberCapacities,rescaleGrid,makeSymmetric,moveNodeSym,delNodeSym,addNodeSym,analyze,buildDesign,switchDesign,resetCurrentDesign,clearTestState,clearOptState,updateRampUI,neighbour,validate,OPT,optStart,optTick,
+  RAMP,rampStart,rampReset,currentLoad,mulberry32,key,mirror,isSym,syncUI,readUI,apply,M,memProps,
+  stickCount,cloneM,useM,analyzeOf,score,mlen,labelOf,history:()=>history};
+
+})();
 </script>
 </body>
 </html>
