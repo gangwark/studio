@@ -3668,6 +3668,327 @@ $('plabBtn').addEventListener('click',()=>{
   fit();});
 $('plabExit').addEventListener('click',()=>{rampStop();$('plabOverlay').style.display='none';});
 window.addEventListener('resize',()=>{if($('plabOverlay').style.display!=='none')fit();});
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXTENSION v1 — additive only. Nothing above this line is modified.
+   Adds:  (1) Assumption sweep      — factorial over the modelling switches
+          (2) Reconciliation        — enter measured result, back-solve the
+                                      assumption set that best explains it
+          (3) Inertia ratio readout — next to the buckling-axis control
+   All three reuse the existing analyze() / memProps() and restore state
+   exactly. No existing function is reassigned or wrapped.
+   ══════════════════════════════════════════════════════════════════════════ */
+const EXT = (function(){
+
+  const AXES   = [['in','in-plane (braced)'],['out','out-of-plane (unbraced)']];
+  const JMODES = [['tension','tension only'],['both','tension + compression']];
+  const CONNS  = [['glue','glued lap'],['lash','string lashing'],['pin','ideal pin']];
+
+  /* ---- state capture / restore -------------------------------------- */
+  function snapshotAssumptions(){
+    return { axis:S.axis, planes:S.planes, jointMode:S.jointMode,
+             conns:S.members.map(m=>m.conn) };
+  }
+  function restoreAssumptions(k){
+    S.axis=k.axis; S.planes=k.planes; S.jointMode=k.jointMode;
+    S.members.forEach((m,i)=>{ if(k.conns[i]!==undefined) m.conn=k.conns[i]; });
+  }
+  function applyConn(c){
+    if(c===null) return;                       // null = leave members as built
+    S.members.forEach(m=>{ if(!memProps(m).isString) m.conn=c; });
+  }
+
+  /* ---- evaluate one configuration ----------------------------------- */
+  function evalConfig(cfg){
+    S.axis=cfg.axis; S.planes=cfg.planes; S.jointMode=cfg.jointMode;
+    applyConn(cfg.conn);
+    const r=analyze();
+    if(!r.ok) return {cfg, ok:false, msg:r.msg};
+    return { cfg, ok:true, capacity:r.capacity, mode:r.mode, sw:r.sw,
+             critical:(r.per[r.critIdx]?mName(S.members[r.critIdx]):'—'),
+             sticks:r.sticks, weightG:r.weightG };
+  }
+
+  /* ---- build the configuration list --------------------------------- */
+  function baseline(){
+    return { axis:S.axis, planes:S.planes, jointMode:S.jointMode, conn:null };
+  }
+  function planeSet(){
+    const p=S.planes, s=new Set([1,2,3,p]);
+    return [...s].filter(x=>x>=1).sort((a,b)=>a-b);
+  }
+  function configs(full){
+    const b=baseline(), out=[], seen=new Set();
+    const push=c=>{ const k=`${c.axis}|${c.planes}|${c.jointMode}|${c.conn}`;
+                    if(!seen.has(k)){seen.add(k);out.push(c);} };
+    push(Object.assign({},b));                               // baseline first
+    if(full){
+      AXES.forEach(([a])=>planeSet().forEach(p=>JMODES.forEach(([j])=>
+        [null].concat(CONNS.map(c=>c[0])).forEach(cn=>
+          push({axis:a,planes:p,jointMode:j,conn:cn})))));
+    } else {                                                  // one-at-a-time
+      AXES.forEach(([a])=>{ if(a!==b.axis) push(Object.assign({},b,{axis:a})); });
+      planeSet().forEach(p=>{ if(p!==b.planes) push(Object.assign({},b,{planes:p})); });
+      JMODES.forEach(([j])=>{ if(j!==b.jointMode) push(Object.assign({},b,{jointMode:j})); });
+      CONNS.forEach(([c])=>push(Object.assign({},b,{conn:c})));
+    }
+    return out;
+  }
+
+  /* ---- run the sweep ------------------------------------------------- */
+  let LAST=null;
+  function runSweep(full){
+    const keep=snapshotAssumptions();
+    let rows;
+    try { rows=configs(full).map(evalConfig); }
+    finally { restoreAssumptions(keep); }                     // always restore
+    const ok=rows.filter(r=>r.ok);
+    const caps=ok.map(r=>r.capacity);
+    LAST={ rows, full,
+           min:caps.length?Math.min(...caps):null,
+           max:caps.length?Math.max(...caps):null,
+           baseCap: rows[0] && rows[0].ok ? rows[0].capacity : null };
+    return LAST;
+  }
+
+  const cfgLabel=c=>{
+    const a=AXES.find(x=>x[0]===c.axis)[1];
+    const j=JMODES.find(x=>x[0]===c.jointMode)[1];
+    const cn=c.conn===null?'as built':CONNS.find(x=>x[0]===c.conn)[1];
+    return `${a} · ${c.planes} plane${c.planes>1?'s':''} · joint ${j} · ${cn}`;
+  };
+
+  /* ---- render the sweep table ---------------------------------------- */
+  function renderSweep(){
+    const el=document.getElementById('extSweepOut'); if(!el||!LAST) return;
+    const {rows,min,max,baseCap}=LAST;
+    const spread=(min&&max&&min>0)?(max/min):null;
+    const head=`<div class="row"><label>Configurations</label><span class="val">${rows.length}</span></div>`+
+      (spread?`<div class="row"><label>Spread</label><span class="val"><b>${spread.toFixed(1)}×</b> — ${min.toFixed(0)} N to ${max.toFixed(0)} N</span></div>`:'')+
+      `<div class="note" style="margin:4px 0 8px">Geometry, material and loading are identical in every row. Only the modelling assumptions differ, and every row is a choice a competent analyst could defend.</div>`;
+    // collapse repeated refusals: the message is the information, not the count
+    const refused={};
+    rows.forEach((r,i)=>{ if(!r.ok&&i>0){refused[r.msg]=(refused[r.msg]||0)+1;} });
+    const shownRefusal={};
+    const body=rows.map((r,i)=>{
+      const base=i===0;
+      if(!r.ok){
+        if(!base){
+          if(shownRefusal[r.msg]) return '';
+          shownRefusal[r.msg]=1;
+          const n=refused[r.msg];
+          return `<tr><td style="opacity:.75">${n>1?n+' configurations':cfgLabel(r.cfg)}</td>`+
+            `<td colspan="3" style="color:var(--bad)">refused — ${r.msg}</td></tr>`;
+        }
+        return `<tr style="font-weight:600"><td>${cfgLabel(r.cfg)}</td>`+
+          `<td colspan="3" style="color:var(--bad)">refused — ${r.msg}</td></tr>`;
+      }
+      const rel=baseCap?(r.capacity/baseCap):null;
+      return `<tr${base?' style="font-weight:600"':''}><td>${cfgLabel(r.cfg)}${base?' <span style="opacity:.6">(baseline)</span>':''}</td>`+
+        `<td style="text-align:right">${r.capacity.toFixed(0)}</td>`+
+        `<td>${r.mode}</td>`+
+        `<td style="text-align:right">${rel?('×'+rel.toFixed(2)):'—'}</td></tr>`;
+    }).join('');
+    el.innerHTML=head+`<div style="overflow:auto;max-height:340px"><table class="tbl" style="width:100%;font-size:11.5px">`+
+      `<thead><tr><th style="text-align:left">Assumption set</th><th style="text-align:right">Failure (N)</th>`+
+      `<th style="text-align:left">Governing mechanism</th><th style="text-align:right">vs base</th></tr></thead>`+
+      `<tbody>${body}</tbody></table></div>`;
+  }
+
+  function sweepCsv(){
+    if(!LAST){alert('Run the sweep first.');return;}
+    const L=['buckling_axis,planes,joint_limit,connection,ok,failure_N,failure_lbf,governing_mechanism,first_member,strength_per_weight_N_per_g,note'];
+    LAST.rows.forEach(r=>{
+      const c=r.cfg;
+      L.push([c.axis,c.planes,c.jointMode,(c.conn===null?'as_built':c.conn),
+        r.ok?'yes':'no',
+        r.ok?r.capacity.toFixed(1):'',
+        r.ok?(r.capacity/LBF).toFixed(1):'',
+        r.ok?r.mode:'', r.ok?r.critical:'',
+        r.ok?r.sw.toFixed(2):'',
+        r.ok?'':('"'+String(r.msg).replace(/"/g,"'")+'"')].join(','));
+    });
+    dl(L.join('\n'),'assumption_sweep.csv');
+  }
+
+  /* ---- reconciliation: which assumption best explains the test? ------- */
+  const MODES=['(not sure)','crushing','buckling','joint pulls apart','wood tears','joint crushing','string breaks'];
+  function reconcile(){
+    const mv=parseFloat((document.getElementById('extMeas')||{}).value);
+    if(!isFinite(mv)||mv<=0){alert('Enter the measured failure load in newtons.');return;}
+    const obs=(document.getElementById('extMode')||{}).value||MODES[0];
+    const haveMode=(obs!==MODES[0]);
+    const sw=runSweep(true);                                  // full factorial
+    renderSweep();
+    const base=sw.rows[0];
+    const b=baseline();
+    const nDiff=c=>{let n=0;
+      if(c.axis!==b.axis)n++; if(c.planes!==b.planes)n++;
+      if(c.jointMode!==b.jointMode)n++; if(c.conn!==null)n++; return n;};
+    // rank on LOAD agreement first; parsimony only breaks ties
+    const rank=list=>list.map(r=>({r,err:Math.abs(Math.log(r.capacity/mv))}))
+                         .sort((a,b2)=>(a.err+0.02*nDiff(a.r.cfg))-(b2.err+0.02*nDiff(b2.r.cfg)));
+    const all=rank(sw.rows.filter(r=>r.ok));
+    const matching=haveMode?rank(sw.rows.filter(r=>r.ok&&r.mode===obs)):all;
+
+    const el=document.getElementById('extRecOut'); if(!el) return;
+    if(!all.length){el.innerHTML='<div class="msg-bad">No analysable configuration to compare against.</div>';return;}
+    const bestAll=all[0], bestMatch=matching.length?matching[0]:null;
+    const TOL=Math.log(1.15), FAR=Math.log(2.5);
+    const bRatio=(base&&base.ok)?(base.capacity/mv):null;
+
+    let html=`<div class="row"><label>Measured</label><span class="val"><b>${mv.toFixed(0)} N</b> (${(mv/LBF).toFixed(0)} lbf)</span></div>`;
+    if(base&&base.ok){
+      html+=`<div class="row"><label>Your prediction</label><span class="val">${base.capacity.toFixed(0)} N — ${base.mode}</span></div>`+
+            `<div class="row"><label>Predicted / measured</label><span class="val"><b>${bRatio.toFixed(2)}×</b></span></div>`;
+      if(haveMode) html+=`<div class="row"><label>Mechanism</label><span class="val">predicted <b>${base.mode}</b> · observed <b>${obs}</b>${base.mode===obs?' ✓':' — different'}</span></div>`;
+    }
+
+    const line=s2=>`${cfgLabel(s2.r.cfg)}<br>predicts <b>${s2.r.capacity.toFixed(0)} N</b> by <b>${s2.r.mode}</b> — ${(s2.r.capacity/mv).toFixed(2)}× measured`;
+
+    if(bestAll.err>FAR){
+      html+=`<div class="msg-bad" style="margin-top:8px">No assumption set in this panel reproduces your result — the
+        closest is ${bestAll.r.capacity.toFixed(0)} N. Something outside these switches is at work: workmanship, a member
+        not built as drawn, initial curvature in the sticks, eccentric loading, or a genuine analysis error.
+        That is a finding, not a failure — record it.</div>`;
+    } else if(haveMode && bestMatch && bestMatch.err<=FAR){
+      const chg=nDiff(bestMatch.r.cfg);
+      html+=`<div class="note" style="margin-top:8px;border-left:3px solid var(--ink);padding-left:8px">
+        <b>Best explanation consistent with what you saw</b>
+        (${chg===0?'your own assumptions — no change needed':chg+' change'+(chg>1?'s':'')+' from what you assumed'}):<br>
+        ${line(bestMatch)}</div>`;
+      if(bestAll.r!==bestMatch.r && bestAll.err+0.05<bestMatch.err){
+        html+=`<div class="note" style="margin-top:6px;color:var(--warn)"><b>Note the conflict.</b> A different
+          configuration matches your load more closely — ${line(bestAll)} — but it fails by a mechanism you did not
+          observe. Trust what you saw on the machine over what matches the number: a closer load with the wrong
+          mechanism is usually a coincidence, not an explanation.</div>`;
+      }
+    } else if(haveMode && (!bestMatch || bestMatch.err>FAR)){
+      html+=`<div class="msg-bad" style="margin-top:8px">Your measured load and your observed mechanism cannot be
+        reconciled by these switches. Nothing that fails by <b>${obs}</b> lands near ${mv.toFixed(0)} N
+        ${bestMatch?`(closest is ${bestMatch.r.capacity.toFixed(0)} N)`:''}. Either the mechanism was misread — buckling and
+        crushing are easy to confuse after the fact — or the structure differed from what was analysed. Photograph the
+        failed member and re-examine it before choosing.</div>`;
+    } else {
+      const chg=nDiff(bestAll.r.cfg);
+      html+=`<div class="note" style="margin-top:8px;border-left:3px solid var(--ink);padding-left:8px">
+        <b>Best explanation</b> (${chg===0?'your own assumptions — no change needed':chg+' change'+(chg>1?'s':'')+' from what you assumed'}):<br>
+        ${line(bestAll)}</div>`;
+    }
+
+    const within=(haveMode?matching:all).filter(s2=>s2.err<=TOL);
+    if(within.length>1){
+      html+=`<div class="note" style="margin-top:6px"><b>${within.length}</b> configurations${haveMode?' matching your mechanism':''}
+        land within 15% of your measured value, so this single test does not identify one assumption uniquely.
+        Distinguishing them needs a second test with a deliberately different design:</div>
+        <ul style="margin:4px 0 0 16px;font-size:11.5px">`+
+        within.slice(0,4).map(s2=>`<li>${cfgLabel(s2.r.cfg)} → ${s2.r.capacity.toFixed(0)} N, ${s2.r.mode}</li>`).join('')+`</ul>`;
+    }
+    html+=`<div class="note" style="margin-top:8px">The full factorial is in the sweep table above; the CSV export
+      carries your measured value alongside every configuration.</div>`;
+    el.innerHTML=html;
+    EXTMEAS={load:mv,mode:obs,best:(bestMatch||bestAll).r,baseline:base&&base.ok?base:null};
+  }
+  let EXTMEAS=null;
+
+  function recCsv(){
+    if(!EXTMEAS||!LAST){alert('Run Reconcile first.');return;}
+    const L=['measured_N,observed_mechanism,buckling_axis,planes,joint_limit,connection,predicted_N,governing_mechanism,predicted_over_measured'];
+    LAST.rows.filter(r=>r.ok).forEach(r=>{const c=r.cfg;
+      L.push([EXTMEAS.load.toFixed(1),'"'+EXTMEAS.mode+'"',c.axis,c.planes,c.jointMode,
+        (c.conn===null?'as_built':c.conn),r.capacity.toFixed(1),'"'+r.mode+'"',
+        (r.capacity/EXTMEAS.load).toFixed(3)].join(','));});
+    dl(L.join('\n'),'reconciliation.csv');
+  }
+
+  /* ---- inertia ratio readout ----------------------------------------- */
+  function updateInertiaNote(){
+    const host=document.getElementById('extIRatio'); if(!host) return;
+    const ref=S.members.find(m=>!memProps(m).isString);
+    const mat=M(S.newMat);
+    const w=(ref?memProps(ref).w:mat.w), t=(mat.t*S.lam);
+    if(!(w>0&&t>0)){host.textContent='';return;}
+    const Iin=t*Math.pow(w,3)/12, Iout=w*Math.pow(t,3)/12;
+    const ratio=Iin/Iout, cur=(S.axis==='in')?Iin:Iout;
+    host.innerHTML=`Section ${(w*1000).toFixed(1)} × ${(t*1000).toFixed(1)} mm ·
+      I<sub>in</sub> = ${(Iin*1e12).toFixed(0)} mm⁴ · I<sub>out</sub> = ${(Iout*1e12).toFixed(0)} mm⁴ ·
+      ratio <b>${ratio.toFixed(1)}×</b> (= (w/t)²). Currently using
+      <b>I<sub>${S.axis==='in'?'in':'out'}</sub> = ${(cur*1e12).toFixed(0)} mm⁴</b>, so switching this control changes
+      every buckling capacity by that factor.`;
+  }
+
+  /* ---- inject the UI (additive; nothing removed) ---------------------- */
+  function injectPanels(){
+    const anchor=document.getElementById('plabAssume');
+    if(!anchor||document.getElementById('extSweepOut')) return;
+    const panel=anchor.closest('.panel')||anchor.parentElement;
+
+    const sweep=document.createElement('div');
+    sweep.className='panel';
+    sweep.innerHTML=`<h2>Assumption sweep</h2>
+      <div class="note" style="margin-bottom:8px">Re-analyses this exact structure under every modelling assumption
+        it could reasonably be given. Same geometry, same material, same load — only the assumptions move.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+        <button class="chipbtn" id="extSweepOne" style="font-weight:700">Sweep assumptions</button>
+        <button class="chipbtn" id="extSweepAll">Full factorial</button>
+        <button class="chipbtn" id="extSweepCsv">Sweep (CSV)</button>
+      </div>
+      <div id="extSweepOut"><div class="note">Not run yet.</div></div>`;
+
+    const rec=document.createElement('div');
+    rec.className='panel';
+    rec.innerHTML=`<h2>Reconcile with the physical test</h2>
+      <div class="note" style="margin-bottom:8px">After you build and break the truss, enter what actually happened.
+        This searches the assumption space for the set that best explains your result — the question the exercise is
+        really asking.</div>
+      <div class="dg-row"><label>Measured failure load (N)</label>
+        <input type="number" id="extMeas" step="1" min="0" placeholder="e.g. 640"></div>
+      <div class="dg-row"><label>Observed mechanism</label>
+        <select id="extMode">${MODES.map(m=>`<option value="${m}">${m}</option>`).join('')}</select></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
+        <button class="chipbtn" id="extRecRun" style="font-weight:700">Reconcile</button>
+        <button class="chipbtn" id="extRecCsv">Reconciliation (CSV)</button>
+      </div>
+      <div id="extRecOut"><div class="note">Nothing entered yet.</div></div>`;
+
+    panel.parentNode.insertBefore(sweep,panel.nextSibling);
+    sweep.parentNode.insertBefore(rec,sweep.nextSibling);
+
+    document.getElementById('extSweepOne').addEventListener('click',()=>{runSweep(false);renderSweep();});
+    document.getElementById('extSweepAll').addEventListener('click',()=>{runSweep(true);renderSweep();});
+    document.getElementById('extSweepCsv').addEventListener('click',sweepCsv);
+    document.getElementById('extRecRun').addEventListener('click',reconcile);
+    document.getElementById('extRecCsv').addEventListener('click',recCsv);
+  }
+
+  function injectInertiaNote(){
+    const sel=document.getElementById('psAxis');
+    if(!sel||document.getElementById('extIRatio')) return;
+    const row=sel.closest('.dg-row')||sel.parentElement;
+    const note=document.createElement('div');
+    note.className='sh'; note.id='extIRatio';
+    note.style.cssText='border-left:3px solid var(--ink);padding-left:8px;margin-top:2px';
+    row.parentNode.insertBefore(note,row.nextSibling);
+    sel.addEventListener('change',()=>setTimeout(updateInertiaNote,0));
+    ['psLam','psW','psT','psNewMat'].forEach(id=>{const e=document.getElementById(id);
+      if(e)e.addEventListener('change',()=>setTimeout(updateInertiaNote,0));});
+    updateInertiaNote();
+  }
+
+  function boot(){
+    injectPanels(); injectInertiaNote();
+    ['plabSetup','psApply','psApplyRebuild','plabBtn'].forEach(id=>{
+      const e=document.getElementById(id);
+      if(e)e.addEventListener('click',()=>setTimeout(()=>{updateInertiaNote();
+        if(LAST){runSweep(LAST.full);renderSweep();}},60));
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  else boot();
+
+  return {runSweep,renderSweep,reconcile,updateInertiaNote,last:()=>LAST,version:'ext-1.0'};
+})();
+globalThis.__trussExt = EXT;
+
 globalThis.__plab={S,WS,MATLIB,CONNLIB,optLogCsv,ensureValidModel,stashWorkspace,openSaved,deleteSaved,designJson,loadDesignJson,snap,rest,governNote,memberCapacities,rescaleGrid,makeSymmetric,moveNodeSym,delNodeSym,addNodeSym,analyze,buildDesign,switchDesign,resetCurrentDesign,clearTestState,clearOptState,updateRampUI,neighbour,validate,OPT,optStart,optTick,
   RAMP,rampStart,rampReset,currentLoad,mulberry32,key,mirror,isSym,syncUI,readUI,apply,M,memProps,
   stickCount,cloneM,useM,analyzeOf,score,mlen,labelOf,history:()=>history};
