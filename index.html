@@ -327,7 +327,7 @@ let solution = null;      // {status, memberForces:{}, reactions:{}, message}
 
 /* view transform: world (m, y-up) -> screen (px, y-down) */
 let view = { scale: 70, ox: 120, oy: 0 };  // oy set on first resize
-const GRID = 0.5;
+let GRID = 0.5;   /* v4: let, so the grid-size selector can set it */
 let unitSystem = 'si';                 // 'si' (m, N) | 'us' (ft, lb) — labels only, values are not converted
 function uL(){ return unitSystem === 'si' ? 'm' : 'ft'; }
 function uF(){ return unitSystem === 'si' ? 'N' : 'lb'; }
@@ -3988,6 +3988,305 @@ const EXT = (function(){
   return {runSweep,renderSweep,reconcile,updateInertiaNote,last:()=>LAST,version:'ext-1.0'};
 })();
 globalThis.__trussExt = EXT;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EXTENSION v2 — additive only. Nothing above this line is modified or removed.
+   Addresses, in order:
+     (1) String tie appearing to "inherit" the balsa result  -> it is a
+         deliberate per-member tie, but nothing said so. Adds explicit feedback.
+     (2) Same behaviour after optimisation                   -> same feedback path.
+     (3) Optimised member longer than stock                  -> adds a diagnostic
+         panel listing the offending members and an "analyse anyway" path that
+         does NOT alter validate(), analyze(), or the optimiser.
+     (4) Erase could not remove a support                    -> adds safe support
+         relocation on erase, fully undoable through the existing undo stack.
+     (5) Assign gave no confirmation                         -> adds a flash on
+         the assigned member and a short toast naming what was assigned.
+   Existing tools, undo, optimiser, accept/revert, and CSV export are untouched.
+   ══════════════════════════════════════════════════════════════════════════ */
+const EXT2 = (function(){
+  const $$=id=>document.getElementById(id);
+
+  /* ---- small toast, bottom-centre of the lab ------------------------------ */
+  let toastEl=null, toastT=null;
+  function toast(html,ms){
+    if(!toastEl){
+      toastEl=document.createElement('div');
+      toastEl.id='extToast';
+      toastEl.style.cssText='position:fixed;left:50%;bottom:26px;transform:translateX(-50%);'+
+        'background:var(--ink,#1F3A54);color:#fff;padding:8px 14px;border-radius:8px;'+
+        'font-size:12.5px;line-height:1.45;max-width:min(560px,86vw);z-index:9999;'+
+        'box-shadow:0 6px 20px rgba(0,0,0,.22);opacity:0;transition:opacity .18s;pointer-events:none';
+      document.body.appendChild(toastEl);
+    }
+    toastEl.innerHTML=html;
+    toastEl.style.opacity='1';
+    if(toastT) clearTimeout(toastT);
+    toastT=setTimeout(()=>{toastEl.style.opacity='0';},ms||3600);
+  }
+
+  /* ---- (1)(2) material feedback ------------------------------------------ */
+  function stickCountOf(matKey){
+    return S.members.filter(m=>(m.mat||'popsicle')===matKey).length;
+  }
+  function materialNotice(){
+    const el=$$('extMatNote'); if(!el) return;
+    const key=S.newMat, mat=M(key), n=S.members.length, nk=stickCountOf(key);
+    if(mat.kind==='string'){
+      el.style.display='block';
+      el.innerHTML='<b>String tie is a per-member choice.</b> Selecting it here does '+
+        '<b>not</b> re-materialise the truss, because a truss made entirely of ties cannot '+
+        'carry compression. The existing '+n+' member'+(n===1?'':'s')+' keep their current material, '+
+        'so the predicted failure load is unchanged — that is why it still reads the same as before. '+
+        'To place a tie, choose the <b>Assign</b> tool and click the member you want to convert. '+
+        'Ties are drawn as dashed lines. Currently '+nk+' member'+(nk===1?' is':'s are')+' string.';
+    } else {
+      el.style.display='block';
+      el.innerHTML='<b>'+mat.label+'</b> applied to all '+n+' member'+(n===1?'':'s')+'. '+
+        'Stock piece length '+(mat.stickL*1000).toFixed(0)+' mm · E '+(mat.E/1e9).toFixed(1)+' GPa · '+
+        'σ<sub>t</sub> '+(mat.sigT/1e6).toFixed(0)+' MPa · σ<sub>c</sub> '+(mat.sigC/1e6).toFixed(0)+' MPa.';
+      setTimeout(()=>{ if(el && M(S.newMat).kind!=='string') el.style.display='none'; },7000);
+    }
+  }
+
+  /* ---- (3) over-length diagnostics --------------------------------------- */
+  function overLength(){
+    const bad=[];
+    for(const m of S.members){
+      const p=memProps(m); if(p.isString) continue;
+      const L=mlen(m.a,m.b);
+      if(L>p.stickL+1e-9) bad.push({m,L,stickL:p.stickL,label:mName(m),mat:p.mat.label});
+    }
+    return bad;
+  }
+  function analyseAnyway(){
+    const bad=overLength(); if(!bad.length) return null;
+    // temporarily lift the stock-length override for the affected materials only,
+    // then restore it exactly — validate() and analyze() are never modified.
+    const keys=[...new Set(S.members.map(m=>m.mat||'popsicle'))];
+    const saved=JSON.parse(JSON.stringify(S.ov||{}));
+    try{
+      keys.forEach(k=>{ S.ov[k]=Object.assign({},S.ov[k]||{},{stickL:99}); });
+      return analyze();
+    } finally {
+      S.ov=saved;
+    }
+  }
+  function renderOverLength(){
+    const el=$$('extLenOut'); if(!el) return;
+    const bad=overLength();
+    if(!bad.length){ el.innerHTML='<div class="note">Every member fits one stock piece.</div>'; return; }
+    const worst=bad.reduce((a,b)=>b.L>a.L?b:a);
+    el.innerHTML='<div class="msg-bad" style="margin-bottom:6px"><b>'+bad.length+' member'+
+      (bad.length===1?'':'s')+' longer than one stock piece.</b> The structural result is withheld '+
+      'because the design cannot be built as drawn — not because the mechanics failed.</div>'+
+      '<table class="tbl" style="width:100%;font-size:11.5px"><thead><tr>'+
+      '<th style="text-align:left">Member</th><th style="text-align:right">Length</th>'+
+      '<th style="text-align:right">Stock</th><th style="text-align:right">Over by</th></tr></thead><tbody>'+
+      bad.map(b=>'<tr><td>'+b.label+'</td><td style="text-align:right">'+(b.L*1000).toFixed(0)+' mm</td>'+
+        '<td style="text-align:right">'+(b.stickL*1000).toFixed(0)+' mm</td>'+
+        '<td style="text-align:right;color:var(--bad)">'+((b.L-b.stickL)*1000).toFixed(0)+' mm</td></tr>').join('')+
+      '</tbody></table>'+
+      '<div class="note" style="margin-top:6px">Three ways forward: raise the stock length in '+
+      '<b>Settings</b> to at least '+(worst.L*1000).toFixed(0)+' mm; switch to a material with longer '+
+      'stock (balsa is 914 mm); or add a joint to split the member. The optimiser only ever proposes '+
+      'members that fit the stock length <i>current at the time it ran</i>, so this usually appears '+
+      'after changing material afterwards.</div>'+
+      '<div style="margin-top:8px"><button class="chipbtn" id="extLenAnyway">Analyse anyway (ignore stock length)</button></div>'+
+      '<div id="extLenAnywayOut"></div>';
+    const btn=$$('extLenAnyway');
+    if(btn) btn.onclick=()=>{
+      const r=analyseAnyway();
+      const o=$$('extLenAnywayOut'); if(!o) return;
+      if(!r||!r.ok){ o.innerHTML='<div class="msg-bad" style="margin-top:6px">Still not analysable: '+
+        ((r&&r.msg)||'unknown')+'. The over-length members are not the only problem.</div>'; return; }
+      o.innerHTML='<div class="note" style="margin-top:8px;border-left:3px solid var(--ink);padding-left:8px">'+
+        '<b>As-analysed, NOT buildable.</b> Predicted failure <b>'+r.capacity.toFixed(0)+' N</b> · '+
+        'first to fail '+(r.per[r.critIdx]?mName(S.members[r.critIdx]):'—')+' by '+r.mode+' · '+
+        'strength/weight '+r.sw.toFixed(1)+' N/g.<br>This figure is for diagnosis only. It assumes stock '+
+        'long enough to cut every member in one piece, which you do not have. Do not report it as a '+
+        'prediction for the truss you can actually build.</div>';
+    };
+  }
+
+  /* ---- (4) erase a support, safely --------------------------------------- */
+  function bottomRowJoints(){
+    const out=[];
+    S.nodes.forEach(k=>{ const [c,r]=parse(k); if(r===0) out.push({k,c}); });
+    return out.sort((a,b)=>a.c-b.c);
+  }
+  function eraseSupportAt(col){
+    const isL=(col===S.supL), isR=(col===S.supR);
+    if(!isL&&!isR) return false;
+    const cands=bottomRowJoints().filter(j=>j.c!==S.supL&&j.c!==S.supR);
+    if(!cands.length){
+      toast('A truss needs two supports, and there is no other bottom-row joint to move this one to. '+
+            'Place a joint on the bottom row first, then erase this support.',5200);
+      return true;                      // handled: we intercepted, but changed nothing
+    }
+    const other=isL?S.supR:S.supL;
+    // move the erased support to the admissible joint furthest from the remaining one,
+    // which keeps the span as wide as possible and never collapses the two together
+    let best=cands[0], bestD=-1;
+    cands.forEach(j=>{ const d=Math.abs(j.c-other); if(d>bestD){bestD=d;best=j;} });
+    pushUndo();
+    if(isL) S.supL=best.c; else S.supR=best.c;
+    S.nodes.add(SUPL()); S.nodes.add(SUPR());
+    clearTestState(); syncUI(); draw();
+    toast('Support removed from that joint and relocated to <b>'+labelOf(best.k)+'</b>. '+
+          'A determinate truss needs exactly two supports, so one cannot simply be deleted. '+
+          'Press <b>Undo</b> to put it back, or use the <b>Support</b> tool to place it elsewhere.',5200);
+    return true;
+  }
+
+  /* ---- (5) assign confirmation ------------------------------------------- */
+  let flash=null, flashT=null;
+  function flashMember(idx){
+    flash={idx,t0:Date.now()};
+    const step=()=>{
+      if(!flash) return;
+      const age=Date.now()-flash.t0;
+      draw();
+      const m=S.members[flash.idx];
+      if(m){
+        const cc=$$('plabCanvas');
+        if(cc&&cc.getContext){
+          const g=cc.getContext('2d');
+          const A=S2(m.a), Bp=S2(m.b);
+          const k=1-Math.min(1,age/900);
+          g.save();
+          g.strokeStyle='rgba(217,136,11,'+(0.85*k).toFixed(3)+')';
+          g.lineWidth=10*k+3; g.lineCap='round';
+          g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(Bp.x,Bp.y); g.stroke();
+          g.restore();
+        }
+      }
+      if(age<900){ flashT=requestAnimationFrame(step); }
+      else { flash=null; draw(); }
+    };
+    if(flashT) cancelAnimationFrame(flashT);
+    flashT=requestAnimationFrame(step);
+  }
+
+  /* ---- interception (capture phase; the original handler is untouched) ---- */
+  function attach(){
+    const cvE=$$('plabCanvas'); if(!cvE||cvE.__ext2) return;
+    cvE.__ext2=true;
+
+    // capture phase: runs BEFORE the existing pointerdown handler
+    cvE.addEventListener('pointerdown',e=>{
+      if(typeof OPT!=='undefined'&&OPT.running&&!OPT.paused) return;
+      if(tool!=='erase') return;
+      const p=pt(e), k=nearestKey(p.x,p.y);
+      if(!k||!S.nodes.has(k)) return;
+      if(k!==SUPL()&&k!==SUPR()) return;          // not a support: let the original run
+      // intercept only for a click landing squarely on the support joint; a click on a
+      // member that merely ends at the support still erases the member, as before
+      const sp=S2(k);
+      if(Math.hypot(p.x-sp.x,p.y-sp.y)>12) return;
+      const [c]=parse(k);
+      e.stopPropagation(); e.preventDefault();
+      eraseSupportAt(c);
+    },true);
+
+    // bubble phase: after the original handler has performed the assignment
+    cvE.addEventListener('pointerdown',e=>{
+      if(tool!=='assign') return;
+      const p=pt(e), mi=hitMember(p.x,p.y);
+      if(mi===null){ toast('Assign: click directly on a member line.',2200); return; }
+      setTimeout(()=>{
+        const m=S.members[mi]; if(!m) return;
+        const mp=memProps(m);
+        const cl=(CONNLIB[m.conn||'glue']||{}).label||m.conn;
+        flashMember(mi);
+        toast('<b>'+mName(m)+'</b> → '+mp.mat.label+' · '+cl+
+              (mp.isString?' &nbsp;<span style="opacity:.85">(drawn dashed; ties carry tension only)</span>':'')+
+              ' &nbsp;<span style="opacity:.7">mirrored about mid-span</span>',3200);
+        renderOverLength();
+      },0);
+    },false);
+  }
+
+  /* ---- UI injection ------------------------------------------------------ */
+  function inject(){
+    if($$('extMatNote')) return;
+    const anchor=$$('plabAssume'); if(!anchor) return;
+    const panel=anchor.closest('.panel')||anchor.parentElement;
+
+    const note=document.createElement('div');
+    note.id='extMatNote';
+    note.className='note';
+    note.style.cssText='display:none;border-left:3px solid var(--ink);padding:8px 10px;margin:8px 0;'+
+      'background:rgba(31,58,84,.05);border-radius:0 6px 6px 0';
+    const host=$$('plabResult');
+    if(host&&host.parentNode) host.parentNode.insertBefore(note,host);
+
+    const lenPanel=document.createElement('div');
+    lenPanel.className='panel';
+    lenPanel.innerHTML='<h2>Stock length check</h2><div id="extLenOut"></div>';
+    panel.parentNode.insertBefore(lenPanel,panel.nextSibling);
+
+    ['qMat','psNewMat'].forEach(id=>{const e=$$(id);
+      if(e) e.addEventListener('change',()=>setTimeout(()=>{materialNotice();renderOverLength();},30));});
+    ['qConn','psNewConn'].forEach(id=>{const e=$$(id);
+      if(e) e.addEventListener('change',()=>setTimeout(renderOverLength,30));});
+    ['psApply','psApplyRebuild','plabBtn','plabSetup'].forEach(id=>{const e=$$(id);
+      if(e) e.addEventListener('click',()=>setTimeout(renderOverLength,120));});
+    ['optAccept','optRevert','optRun','optStop'].forEach(id=>{const e=$$(id);
+      if(e) e.addEventListener('click',()=>setTimeout(()=>{renderOverLength();},400));});
+    renderOverLength();
+  }
+
+  function boot(){ inject(); attach(); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);
+  else setTimeout(boot,0);
+  // the lab is created on demand; re-attach whenever it is opened
+  setInterval(()=>{ const c=$$('plabCanvas'); if(c&&!c.__ext2) boot(); },1200);
+
+  return {materialNotice,renderOverLength,analyseAnyway,overLength,toast,
+          eraseSupportAt,flashMember,screenOf:k=>S2(k),version:'ext2-1.0'};
+})();
+globalThis.__trussExt2 = EXT2;
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRUSS EXTENSION v3 — additive. Adds finer grid-size choices (0, 0.25, 0.5,
+   0.75, 1). Nothing else changes: geometry, rendering, solver and every other
+   control are untouched. "0" means no snapping, implemented through the
+   existing Snap checkbox so the grid drawing loop never receives a zero step.
+   ══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  const $=id=>document.getElementById(id);
+  function inject(){
+    if($('gridSizeSel')) return;
+    const chk=$('chkGridSnap'), lbl=$('lblSnap');
+    if(!chk||!lbl) return;
+    const row=chk.closest('.checkrow')||chk.parentNode;
+    const wrap=document.createElement('div');
+    wrap.className=row.className||'checkrow';
+    wrap.style.cssText='margin-top:4px;display:flex;align-items:center;gap:6px';
+    wrap.innerHTML='<label for="gridSizeSel" style="flex:1">Grid size</label>'+
+      '<select id="gridSizeSel" style="padding:2px 6px;font-size:12px">'+
+      '<option value="0">0 — no snap</option>'+
+      '<option value="0.25">0.25</option>'+
+      '<option value="0.5" selected>0.5</option>'+
+      '<option value="0.75">0.75</option>'+
+      '<option value="1">1</option></select>';
+    row.parentNode.insertBefore(wrap,row.nextSibling);
+    $('gridSizeSel').addEventListener('change',e=>{
+      const v=parseFloat(e.target.value);
+      if(v>0){ GRID=v; chk.checked=true; }
+      else   { chk.checked=false; }              // 0 = snapping off; GRID unchanged for drawing
+      lbl.textContent='Snap to '+(v>0?v:GRID)+' '+(typeof uL==='function'?uL():'m')+' grid';
+      try{ draw(); }catch(err){}
+    });
+    chk.addEventListener('change',()=>{ if(chk.checked&&$('gridSizeSel').value==='0') $('gridSizeSel').value=String(GRID); });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',inject);
+  else setTimeout(inject,0);
+  setInterval(inject,1500);
+  globalThis.__trussExt3={get grid(){return GRID;},version:'tx3-1.0'};
+})();
 
 globalThis.__plab={S,WS,MATLIB,CONNLIB,optLogCsv,ensureValidModel,stashWorkspace,openSaved,deleteSaved,designJson,loadDesignJson,snap,rest,governNote,memberCapacities,rescaleGrid,makeSymmetric,moveNodeSym,delNodeSym,addNodeSym,analyze,buildDesign,switchDesign,resetCurrentDesign,clearTestState,clearOptState,updateRampUI,neighbour,validate,OPT,optStart,optTick,
   RAMP,rampStart,rampReset,currentLoad,mulberry32,key,mirror,isSym,syncUI,readUI,apply,M,memProps,
